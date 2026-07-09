@@ -127,6 +127,9 @@ void nscsi_full_device::step(bool timeout)
 			for(m_scsi_initiator_id = 0; m_scsi_initiator_id != 16 && (m_scsi_initiator_id == m_scsi_id || (data & (1 << m_scsi_initiator_id))); m_scsi_initiator_id++) {};
 			if(m_scsi_initiator_id == 16)
 				m_scsi_initiator_id = -1;
+			// new nexus: an IDENTIFY from a previous selection must not leak into
+			// this one (a selection without IDENTIFY falls back to the CDB/default LUN)
+			m_scsi_identify = 0;
 			m_scsi_state = TARGET_SELECT_WAIT_BUS_SETTLE;
 			m_scsi_timer->adjust(scsi_bus_settle_delay(), true);
 		}
