@@ -215,16 +215,6 @@ TIMER_CALLBACK_MEMBER(mb87030_device::delay_timeout)
 	step(false);
 }
 
-TIMER_CALLBACK_MEMBER(mb87030_device::bus_free_timeout)
-{
-	if(!(m_ssts & SSTS_INIT_CONNECTED))
-		return;
-
-	LOG("SCSI disconnect\n");
-	scsi_disconnect();
-	scsi_set_ctrl(0, S_ALL);
-}
-
 void mb87030_device::scsi_command_complete()
 {
 	LOG("%s\n", __FUNCTION__);
@@ -300,18 +290,34 @@ void mb87030_device::step(bool timeout)
 			timeout ? " timeout" : "", data,
 					ctrl, m_tc);
 
-	if ((ctrl & (S_BSY|S_SEL)) == 0) {
-		if ((m_ssts & SSTS_INIT_CONNECTED) && m_bus_free_timer->remaining() == attotime::never)
-			m_bus_free_timer->adjust(attotime::from_msec(10));
-	} else
-		m_bus_free_timer->adjust(attotime::never);
-
 	if ((m_sctl & SCTL_RESET_AND_DISABLE) && m_state != State::Idle) {
 		scsi_set_ctrl(0, S_ALL);
 		m_ssts &= ~SSTS_SPC_BUSY;
 		m_fifo.clear();
 		update_state(State::Idle);
 		return;
+	}
+
+	// Bus-free (disconnect) monitoring: when the initiator is connected and
+	// the bus is observed free, flag the disconnect right away.  This must
+	// not trigger while the SPC itself is executing arbitration/selection:
+	// the bus is legitimately free at several points of those sequences, and
+	// a Select command that gets no BSY response must terminate through the
+	// TC-programmed selection timeout (INTS_SPC_TIMEOUT), not through a
+	// disconnect.  m_state parks in WaitNewState while a delayed transition
+	// is pending, so use the effective target state for the check.
+	const State live_state = (m_state == State::WaitNewState) ? m_delay_state : m_state;
+	const bool executing_selection =
+		live_state == State::ArbitrationWaitBusFree || live_state == State::ArbitrationAssertBSY ||
+		live_state == State::ArbitrationWait || live_state == State::ArbitrationAssertSEL ||
+		live_state == State::SelectionWaitBusFree || live_state == State::SelectionAssertID ||
+		live_state == State::SelectionAssertSEL || live_state == State::SelectionWaitBSY ||
+		live_state == State::Selection;
+
+	if ((ctrl & (S_BSY|S_SEL)) == 0 && (m_ssts & SSTS_INIT_CONNECTED) && !executing_selection) {
+		LOG("SCSI disconnect\n");
+		scsi_disconnect();
+		scsi_set_ctrl(0, S_ALL);
 	}
 
 	switch (m_state) {
@@ -521,7 +527,6 @@ void mb87030_device::device_start()
 {
 	m_timer = timer_alloc(FUNC(mb87030_device::timeout), this);
 	m_delay_timer = timer_alloc(FUNC(mb87030_device::delay_timeout), this);
-	m_bus_free_timer = timer_alloc(FUNC(mb87030_device::bus_free_timeout), this);
 
 	save_item(NAME(m_bdid));
 	save_item(NAME(m_sctl));
