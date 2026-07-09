@@ -142,7 +142,6 @@ private:
 
 	emu_timer *m_timer;
 	emu_timer *m_delay_timer;
-	emu_timer *m_bus_free_timer;
 
 	enum class State: uint8_t {
 		Idle,
@@ -183,7 +182,6 @@ private:
 
 	TIMER_CALLBACK_MEMBER(delay_timeout);
 	TIMER_CALLBACK_MEMBER(timeout);
-	TIMER_CALLBACK_MEMBER(bus_free_timeout);
 
 	// registers
 	uint8_t m_bdid;
