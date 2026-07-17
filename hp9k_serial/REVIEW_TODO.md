@@ -44,9 +44,17 @@ on the handler to read the frame. [README + `m68k_fault.lua` corrected.]
 - [x] **68030 address-error frame encodes vector 2, not 3** — `m68ki_exception_address_error` passes
       `EXCEPTION_BUS_ERROR` to the frame builders (`m68kcpu.h:1655/1660/1664/1668`); should be `EXCEPTION_ADDRESS_ERROR`
       (offset 0x0C). DONE — pushed on `m68k-address-error-vector` (5x).
-- [ ] **DIO shared IRQ/DMAR not wired-OR** — bus drives the CPU line from the last card's raw transition; aggregate
+- [x] **DIO shared IRQ/DMAR not wired-OR** — bus drives the CPU line from the last card's raw transition; aggregate
       accessor uses `~m_bus_index` not `~(1U<<m_bus_index)` (`hp_dio.cpp:153`, `hp_dio.h:112`). Affects the 98644 IRQ
-      if a slot shares a level (Codex).
+      if a slot shares a level (Codex). **DONE 2026-07-17** — 3-model panel (agy/Fable/Codex, all ACCEPT-WITH-CHANGES,
+      unanimous). Fix: `set_irq`+`set_dmar` now drive the wired-OR **aggregate** on real line transitions only
+      (`old_line != new_line`), `1U<<index` + bounds asserts, deleted the (bus-self-exclusion) `m_bus_index != index`
+      guard as subsumed, accessors `!= 0`. Chose `!= 0` (bus-self bit participates) over `& ~(1U<<m_bus_index)` — all 3
+      seats concurred, documented in-code. Kept `u16` (not agy's u32): configs top out at ~7 slots, no savestate churn.
+      Panel corrections folded in: guard is intentional-not-vestigial; `set_dmar` had the identical live bug (98620
+      caches last `dmarN_in`); fire edge-only. Rebuilt, regression PASS (`regress_dio_wiredor.py`: boots OpenBSD 2.2
+      over serial, `dca0 ... ipl 5` round-trips, SCSI DMA reads OK). Follow-ups still open below (reset hardening was
+      DELIBERATELY excluded — Fable flagged bus-vs-card reset-ordering desync risk; needs its own PR).
 - [ ] **hp360 (DIO32) CPU RESET not wired + IRQ6 double-driven** — `DIO32_SLOT` path omits reset (`hp9k_3xx.cpp:267`
       vs `:252`); PTM + DIO both drive IRQ6 directly → use `INPUT_MERGER_ANY_HIGH` (`hp9k_3xx.cpp:323`) (Codex).
 - [ ] **gdbstub MMU-crossing `m`/`M`** translate only the first page then increment physical → wrong across
