@@ -40,8 +40,9 @@ class SerialConsole:
         if not self.hs.expect(r"login:", timeout=timeout):
             raise RuntimeError("no serial login: prompt (getty didn't come up)")
         self.hs.send(user)
-        # 'unknown' terminal type -> login asks "Terminal type? [unknown]"; take the default.
-        self.hs.expect(r"[Tt]erminal|TERM|[%#\$]", timeout=25)
+        # 'unknown' terminal type -> login asks "Terminal type? [unknown]"; take the default. (review: do
+        # NOT match a bare #/$ here -- it appears in the MOTD and returned early, desyncing login.)
+        self.hs.expect(r"[Tt]erminal type|TERM =", timeout=25)
         self.hs.send("")
         self.hs.expect(r"[%#\$]", timeout=25)
         self.hs.send("/bin/sh")

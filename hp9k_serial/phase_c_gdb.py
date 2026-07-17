@@ -153,7 +153,7 @@ def main():
         print("SR=%s PC=%s" % (("%04X" % (r["sr"] & 0xffff)) if r.get("sr") is not None else "????", hx("pc")))
         print("FAULT_PC(@A7+2)=%s FAULT_SR(@A7)=%s" %
               (("%08X" % result["fault_pc"]) if result.get("fault_pc") is not None else "?",
-               ("%04X" % (result["fault_sr"] & 0xffff)) if result.get("fault_sr") is not None else "?"))
+               ("%04X" % ((result["fault_sr"] >> 16) & 0xffff)) if result.get("fault_sr") is not None else "?"))
         dvals = [r.get(n) for n in REG_NAMES[:8]]
         matched = 0x41424344 in dvals and r.get("a0") == 0
         print("CAPTURE:", "MATCHES NULL-write (A0=0 + 41424344)" if matched

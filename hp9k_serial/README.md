@@ -17,9 +17,12 @@ m68k register capture at faults, bringing hp300 to parity with the pmax/arc/amig
 - [x] **Phase C (#2) — m68k fault register capture: DONE (via `-debugger gdbstub`).** `phase_c_gdb.py` is a
   minimal gdb-remote client: connect, fetch `target.xml` (MAME serves `g`/`p` only after that), `Z1`
   breakpoint on the bus-error handler PC (`0x1A1A`), arm AFTER boot, fire the fault, and read
-  D0-D7/A0-A7/SR/PC + the stacked fault PC — the m68k analog of the pmax gdb capture. (Dead ends, kept in
-  `m68k_fault.lua`: the 68030 PMMU-fault bus error bypasses `debugger_exception_hook` so `epset` misses it;
-  `bpset` actions don't run under `-debugger none`.)
+  D0-D7/A0-A7/SR/PC + the stacked fault PC — the m68k analog of the pmax gdb capture. (Real dead end: `epset`
+  and `bpset` **actions don't execute under `-debugger none`** — that's the blocker. CORRECTION, panel +
+  source-verified 2026-07-16: the earlier claim that the PMMU-fault bus error bypasses
+  `debugger_exception_hook` is FALSE — the MMU path DOES call it (`m68kcpu.cpp:957` → `m68kcpu.h:1164`). So
+  the better capture is `-debugger gdbstub` + `monitor epset 2`/`epset 3` (image-independent, discriminates
+  bus-error vs address-error), combined with a `bpset` on the handler to read the built stack frame — TODO.)
 - [x] **#3 (raw-disk panic): reproduced + characterized.** `phase4_panic.py` attaches a blank unlabeled
   `rsd1` and reads `/dev/rsd1c`, capturing a kernel null-deref (`A5=0`, SR supervisor) at `FAULT_PC=0x10C26`
   = **`_db_lookup`** (via `phase4_symbol.py`/`nm /bsd`): reading the label-less raw disk drops into DDB and
