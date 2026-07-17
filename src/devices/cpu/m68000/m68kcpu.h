@@ -1644,6 +1644,9 @@ inline void m68ki_exception_address_error()
 
 	m_run_mode = RUN_MODE_BERR_AERR_RESET_WSF;
 
+	// The vector encoded into the stacked format/vector word must match the exception actually taken
+	// (address error -> vector 3, offset 0x00C), consistent with m68ki_jump_vector() below; passing
+	// EXCEPTION_BUS_ERROR here previously mis-stamped the frame as a bus error (offset 0x008).
 	if (CPU_TYPE_IS_000())
 	{
 		/* Note: This is implemented for 68000 only! */
@@ -1652,20 +1655,20 @@ inline void m68ki_exception_address_error()
 	else if (CPU_TYPE_IS_010())
 	{
 		/* only the 68010 throws this unique type-1000 frame */
-		m68ki_stack_frame_1000(m_ppc, sr, EXCEPTION_BUS_ERROR, m_mmu_tmp_buserror_address);
+		m68ki_stack_frame_1000(m_ppc, sr, EXCEPTION_ADDRESS_ERROR, m_mmu_tmp_buserror_address);
 	}
 	else if (CPU_TYPE_IS_070())
 	{
 		/* only the 68070 throws this unique type-1111 frame */
-		m68ki_stack_frame_1111(m_ppc, sr, EXCEPTION_BUS_ERROR, m_mmu_tmp_buserror_address);
+		m68ki_stack_frame_1111(m_ppc, sr, EXCEPTION_ADDRESS_ERROR, m_mmu_tmp_buserror_address);
 	}
 	else if (m_mmu_tmp_buserror_address == m_ppc)
 	{
-		m68ki_stack_frame_1010(sr, EXCEPTION_BUS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
+		m68ki_stack_frame_1010(sr, EXCEPTION_ADDRESS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
 	}
 	else
 	{
-		m68ki_stack_frame_1011(sr, EXCEPTION_BUS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
+		m68ki_stack_frame_1011(sr, EXCEPTION_ADDRESS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
 	}
 
 	m68ki_jump_vector(EXCEPTION_ADDRESS_ERROR);
