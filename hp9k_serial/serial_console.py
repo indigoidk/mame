@@ -26,10 +26,12 @@ class SerialConsole:
         self.hs = HpSerial(log_path=log_path, mame_log_path=mame_log_path)
         self._n = 0
 
-    def boot(self, seconds=600):
+    def boot(self, seconds=600, lua=None, extra=None, chd2=None, video="none"):
         self.hs.listen()
-        # NO -autoboot_script: the baked-in getty presents login: over serial on its own.
-        self.hs.launch_mame(chd=SERIAL_CHD, seconds=seconds, video="none")
+        # No Lua needed for a plain console (baked getty auto-logins). Pass lua=... to arm a hook alongside
+        # the getty; chd2=... attaches a 2nd SCSI disk (rsd1) for the raw-disk-panic repro; video="gdi"
+        # to capture framebuffer panics via snapshot.
+        self.hs.launch_mame(chd=SERIAL_CHD, chd2=chd2, seconds=seconds, video=video, lua=lua, extra=extra)
         if not self.hs.accept():
             raise RuntimeError("MAME did not connect: %s" % self.hs.connect_error)
         return self

@@ -33,14 +33,18 @@ WORK_CHD = r"C:\DocumentNoSnc\CC\hp_mame\obsd_test\serial_work.chd"    # MAME wr
 PORT = 1250
 
 
-def mame_hp9k360_args(chd=WORK_CHD, port=PORT, lua=None, seconds=None,
+def mame_hp9k360_args(chd=WORK_CHD, chd2=None, port=PORT, lua=None, seconds=None,
                       video="none", extra=None):
-    """Standard hp9k360 + 98644-serial-to-socket launch argv (the disk-booting recipe)."""
+    """Standard hp9k360 + 98644-serial-to-socket launch argv (the disk-booting recipe).
+    chd2 attaches a SECOND SCSI disk at scsibus:5 (-> guest rsd1), for the raw-disk-panic repro (#3)."""
     a = [MAME_EXE, "hp9k360",
          "-rp", r"mame\roms",
-         "-sl4", "98265a",                 # SCSI controller (disk won't boot without it)
-         "-hard", chd,
-         "-sl2", "98644", "-sl2:98644:rs232", "null_modem",
+         "-sl4", "98265a"]                 # SCSI controller (disk won't boot without it)
+    if chd2:
+        a += ["-sl4:98265a:scsibus:5", "harddisk", "-hard1", chd, "-hard2", chd2]
+    else:
+        a += ["-hard", chd]
+    a += ["-sl2", "98644", "-sl2:98644:rs232", "null_modem",
          "-bitb", "socket.127.0.0.1:%d" % port,
          "-video", video, "-sound", "none", "-nothrottle", "-skip_gameinfo"]
     if lua:

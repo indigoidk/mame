@@ -14,7 +14,15 @@ m68k register capture at faults, bringing hp300 to parity with the pmax/arc/amig
   `serial_console.py` (`SerialConsole`: boot → login → `run()` with clean `stty -echo` capture). (d) fire
   batch ported: `fire_portmap_serial.py` fires #2 portmap AUTH_UNIX over serial and drops portmap
   (9 svcs UP → DOWN), reproducing the finding. Any `fire_*_nk.lua` ports the same way via `run()`.
-- [ ] **Phase C (#2)** — MAME `-debug` m68k register hook at faults (not started).
+- [~] **Phase C (#2) — m68k fault register capture: infrastructure done, capture-trigger WIP.** The serial
+  console reliably drives a fault (NULL write → SIGSEGV) and the hook installs; registers are readable via
+  `cpu.state[..].value` and `space:readv_u32` (virtual, MMU-aware). Remaining subtlety (documented in
+  `m68k_fault.lua`): on the 68030 a bad access is a **PMMU fault raised as a bus error that bypasses
+  `debugger_exception_hook`** (m68kcpu.h:1164 is the sole call; `EXCEPTION_BUS_ERROR` is "not emulated"),
+  so `epset 2/3` never fires. `bpset` on the vector-2/3 handler PC (`0x1A1A`, read via `readv_u32(VBR+8)`)
+  is set but its **action doesn't execute under `-debugger none`** (nor can a Lua periodic catch the paused
+  stop). Next: a debugger provider that runs actions headlessly, or `-debugger gdbstub` + a gdb client
+  (the m68k analog of the pmax gdb capture), or capture inside a custom exception path.
 
 ## Serial-console usage (the fire-batch foundation)
 ```python
