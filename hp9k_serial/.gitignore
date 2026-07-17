@@ -1,0 +1,3 @@
+# transient run artifacts (serial captures, MAME stdout) — not source
+*.log
+ser_monitor.log

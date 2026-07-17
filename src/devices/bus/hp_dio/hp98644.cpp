@@ -47,6 +47,14 @@ private:
 
 	bool     m_loopback;
 	uint8_t  m_data;
+
+	// hp9k_serial fix (2026-07-16): the UART interrupt was never routed to the DIO bus, so an
+	// interrupt-driven guest (OpenBSD 2.2 dca) could not drive TX/RX past the first byte. Wire the
+	// INS8250 int -> board IC_IE gate -> selected DIO IRQ, mirroring hp98265a. See CC_HP-CDROM notes.
+	void     irq_w(int state);
+	int      get_int_level();
+	void     update_irq(bool state);
+	bool     m_irq_state;
 };
 
 //-------------------------------------------------
@@ -62,6 +70,7 @@ void dio16_98644_device::device_add_mconfig(machine_config &config)
 	m_uart->out_tx_callback().set(RS232_TAG, FUNC(rs232_port_device::write_txd));
 	m_uart->out_dtr_callback().set(RS232_TAG, FUNC(rs232_port_device::write_dtr));
 	m_uart->out_rts_callback().set(RS232_TAG, FUNC(rs232_port_device::write_rts));
+	m_uart->out_int_callback().set(DEVICE_SELF, FUNC(dio16_98644_device::irq_w));
 
 	rs232_port_device &rs232(RS232_PORT(config, RS232_TAG, default_rs232_devices, nullptr));
 	rs232.rxd_handler().set(m_uart, FUNC(ins8250_uart_device::rx_w));
@@ -92,7 +101,8 @@ dio16_98644_device::dio16_98644_device(const machine_config &mconfig, device_typ
 	m_installed_io{false},
 	m_control{0},
 	m_loopback{false},
-	m_data{0}
+	m_data{0},
+	m_irq_state{false}
 {
 }
 
@@ -177,6 +187,7 @@ void dio16_98644_device::device_start()
 	save_item(NAME(m_control));
 	save_item(NAME(m_loopback));
 	save_item(NAME(m_data));
+	save_item(NAME(m_irq_state));
 	m_installed_io = false;
 }
 
@@ -200,6 +211,29 @@ void dio16_98644_device::device_reset()
 	}
 	m_data = 0;
 	m_control = 0;
+	m_loopback = false;
+	m_irq_state = false;
+}
+
+int dio16_98644_device::get_int_level()
+{
+	return (m_switches->read() >> REG_SWITCHES_INT_LEVEL_SHIFT) & REG_SWITCHES_INT_LEVEL_MASK;
+}
+
+void dio16_98644_device::update_irq(bool state)
+{
+	int const level = get_int_level();
+	irq3_out(state && level == 0);
+	irq4_out(state && level == 1);
+	irq5_out(state && level == 2);
+	irq6_out(state && level == 3);
+}
+
+void dio16_98644_device::irq_w(int state)
+{
+	m_irq_state = bool(state);
+	// board interrupt-enable (IC_IE, control bit 7) gates the UART int onto the DIO bus
+	update_irq((m_control & 0x80) ? m_irq_state : false);
 }
 
 uint16_t dio16_98644_device::io_r(offs_t offset)
@@ -216,9 +250,14 @@ uint16_t dio16_98644_device::io_r(offs_t offset)
 		break;
 
 	case 1:
-		ret = m_control | m_control << 8 |
-		(((m_switches->read() >> REG_SWITCHES_INT_LEVEL_SHIFT) & REG_SWITCHES_INT_LEVEL_MASK) << 4);
+	{
+		// IC_IE (bit 7, m_control) | IC_IR (bit 6, pending UART int) | int level (bits 4-5).
+		// Duplicated into both bytes so the read is byte-lane independent (as before).
+		uint8_t const status = m_control | (m_irq_state ? 0x40 : 0) |
+			(((m_switches->read() >> REG_SWITCHES_INT_LEVEL_SHIFT) & REG_SWITCHES_INT_LEVEL_MASK) << 4);
+		ret = status | (status << 8);
 		break;
+	}
 
 	case 0x08:
 	case 0x09:
@@ -251,10 +290,12 @@ void dio16_98644_device::io_w(offs_t offset, uint16_t data)
 
 	switch(offset) {
 	case 0:
+		m_uart->reset();
 		device_reset();
 		break;
 	case 1:
 		m_control = data & 0x80;
+		update_irq((m_control & 0x80) ? m_irq_state : false);
 		break;
 
 	case 0x08:
@@ -273,4 +314,3 @@ void dio16_98644_device::io_w(offs_t offset, uint16_t data)
 } // anonymous namespace
 
 DEFINE_DEVICE_TYPE_PRIVATE(HPDIO_98644, bus::hp_dio::device_dio16_card_interface, dio16_98644_device, "dio98644", "HP98644A Asynchronous Serial Interface")
-
