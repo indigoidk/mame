@@ -152,68 +152,75 @@ unsigned dio16_device::add_card(device_dio16_card_interface &card)
 
 void dio16_device::set_irq(unsigned index, unsigned int level, int state)
 {
-	bool const changed(bool(state) != BIT(m_irq[level], index));
-	if (!changed)
+	assert(level < 7);
+	assert(index < 8U * sizeof(m_irq[level]));   // bit index must fit the source bitmap
+
+	u16 &sources = m_irq[level];
+	u16 const mask = u16(1U << index);
+	bool const asserted = bool(state);
+
+	if (asserted == bool(sources & mask))
+		return;                                  // this source's contribution is unchanged
+
+	bool const old_line = bool(sources);
+	if (asserted)
+		sources |= mask;
+	else
+		sources &= u16(~mask);
+
+	// Open-collector wired-OR: the DIO interrupt line is asserted while ANY source asserts
+	// it (bus cards, or the bus's own irqN_in pins at bit m_bus_index) and released only
+	// when the last source releases.  Propagate real line transitions only.
+	// (The former "& ~m_bus_index" masked out real card bits -- an index-used-as-mask bug.)
+	bool const new_line = bool(sources);
+	if (new_line == old_line)
 		return;
 
-	if (state)
-		m_irq[level] |= (1 << index);
-	else
-		m_irq[level] &= ~(1 << index);
-
-	if (m_bus_index != index) {
-		switch (level) {
-		case 0:
-			m_irq1_out_cb(state);
-			break;
-		case 1:
-			m_irq2_out_cb(state);
-			break;
-		case 2:
-			m_irq3_out_cb(state);
-			break;
-		case 3:
-			m_irq4_out_cb(state);
-			break;
-		case 4:
-			m_irq5_out_cb(state);
-			break;
-		case 5:
-			m_irq6_out_cb(state);
-			break;
-		case 6:
-			m_irq7_out_cb(state);
-			break;
-		}
+	int const line = new_line ? ASSERT_LINE : CLEAR_LINE;
+	switch (level) {
+	case 0: m_irq1_out_cb(line); break;
+	case 1: m_irq2_out_cb(line); break;
+	case 2: m_irq3_out_cb(line); break;
+	case 3: m_irq4_out_cb(line); break;
+	case 4: m_irq5_out_cb(line); break;
+	case 5: m_irq6_out_cb(line); break;
+	case 6: m_irq7_out_cb(line); break;
 	}
 }
 
 void dio16_device::set_dmar(unsigned int index, unsigned int num, int state)
 {
-	assert(num <= 1);
+	assert(num < 2);
+	assert(index < 8U * sizeof(m_dmar[num]));
 
-	bool const changed(bool(state) != BIT(m_dmar[num], index));
-	if (!changed)
+	u16 &sources = m_dmar[num];
+	u16 const mask = u16(1U << index);
+	bool const asserted = bool(state);
+
+	if (asserted == bool(sources & mask))
 		return;
-	if (state)
-		m_dmar[num] |= (1 << index);
+
+	bool const old_line = bool(sources);
+	if (asserted)
+		sources |= mask;
 	else
-		m_dmar[num] &= ~(1 << index);
+		sources &= u16(~mask);
 
+	// DMAR is a shared wired-OR request line (DMACK is the separate point-to-point path).
+	// Deliver the aggregate line on a real transition; skipping the originator (no
+	// self-loopback) stays correct because only the determining source flips the line.
+	bool const new_line = bool(sources);
+	if (new_line == old_line)
+		return;
 
+	int const line = new_line ? ASSERT_LINE : CLEAR_LINE;
 	for (auto &card : m_cards) {
-
 		if (card->get_index() == index)
 			continue;
-
-		switch (num) {
-		case 0:
-			card->dmar0_in(state);
-			break;
-		case 1:
-			card->dmar1_in(state);
-			break;
-		}
+		if (num == 0)
+			card->dmar0_in(line);
+		else
+			card->dmar1_in(line);
 	}
 }
 
