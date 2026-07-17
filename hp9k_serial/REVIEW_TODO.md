@@ -4,6 +4,23 @@ Panel: Fable + Codex 5.6-SOL (ultra) + agy Gemini 3.1 Pro + ollama cloud (deepse
 kimi-k2.7-code). Fable + Codex read the repo/source; the rest reviewed embedded source. Convergence noted
 as (Nx). **Applied fixes** are checked; the rest is prioritized work.
 
+## 2026-07-17 — done this session (pushed)
+- **`monitor epset` over gdbstub: VALIDATED.** `epset 2`/`epset 3` (set via qRcmd -> execute_command,
+  debuggdbstub.cpp:1293) halt under `-debugger gdbstub` and report a stop, and halt at the handler
+  start with the frame already stacked. New harness `phase_c_epset.py`: image-independent capture (no
+  hardcoded 0x1A1A), decodes format/vector/fault-address/SSW, walks the A6 chain, auto-symbolizes from
+  a cached `nm -n /bsd` (`nm_bsd_text.txt`).
+- **NEW FINDING — `epset 2` is too broad on the 68030.** A demand-paging / copyin fault is itself a
+  vector-2 bus error, so `epset 2` stops on every routine page fault (caught a supervisor copyin of
+  user-data 0x4DCC8, SSW FC=1). Catch panics via `_panic`/`_Debugger`/`_kdb_trap` breakpoints; keep
+  `epset 3` (address error — never a normal page fault).
+- **NEW FINDING — a raw `rsd1c` read does NOT reliably panic.** OpenBSD 2.2 synthesizes a default label
+  ("no disk label, defining `c' partition as entire disk") and reads fine. The old `0x10C26` = `_db_lookup`
+  capture was the ddb *secondary*, not the origin. The #3 "bad kernel read at 0x0" needs a more specific
+  trigger (a partition with no default label, or a corrupt-label state) — under investigation.
+- **hp98644 hardening + m68k address-error fix: applied, rebuilt, regression-passed** (boots + reads a
+  raw disk over serial). Upstream PR branches pushed: `hp98644-dio-irq`, `m68k-address-error-vector`.
+
 ## Key correction (Fable + Codex, source-verified)
 The earlier claim "the 68030 PMMU-fault bus error bypasses `debugger_exception_hook`" is **FALSE**. The
 MMU-enabled path calls `m68ki_init_exception(EXCEPTION_BUS_ERROR)` (`m68kcpu.cpp:957`) → the hook
@@ -15,8 +32,8 @@ on the handler to read the frame. [README + `m68k_fault.lua` corrected.]
 ## BUGS
 - [x] `phase_c_gdb.py` fault-SR parse: SR is the HIGH 16 of u32@A7 (`>>16`), not the low half (3x: agy/Fable/Codex).
 - [x] `serial_console.py` `login()` TERM expect matched a bare `#/$` from the MOTD → premature/desync (2x: Fable/Codex).
-- [ ] `hp98644.cpp`: add `device_post_load()` re-driving the DIO IRQ after a savestate, and call `update_irq(false)`
-      in `device_reset()` to deassert (5x: agy/deepseek/glm/Fable/Codex). Needs rebuild + a savestate regression test.
+- [x] `hp98644.cpp`: add `device_post_load()` re-driving the DIO IRQ after a savestate, and call `update_irq(false)`
+      in `device_reset()` to deassert (5x: agy/deepseek/glm/Fable/Codex). DONE — pushed on `hp98644-dio-irq`.
 - [ ] gdb RSP client (`phase_c_gdb.py`): validate checksums, handle NACK/escaping/retransmit, use `Z0,addr,2`
       (not kind 4), reliable socket/`z` cleanup, reconcile worker deadline vs join (2x: Codex/Fable, +kimi).
 - [ ] `fire_portmap_serial.py`: `payload; echo FIRED` reports `echo`'s RC, not the payload's; transport failures
@@ -24,9 +41,9 @@ on the handler to read the frame. [README + `m68k_fault.lua` corrected.]
 - [ ] `hp_ser_io.py` `expect(since=None)` starts at current buffer end → can miss an already-received prompt (Codex/kimi).
 
 ## ARCH "truing" — real MAME bugs, upstream-PR candidates (mostly Codex, source-cited)
-- [ ] **68030 address-error frame encodes vector 2, not 3** — `m68ki_exception_address_error` passes
+- [x] **68030 address-error frame encodes vector 2, not 3** — `m68ki_exception_address_error` passes
       `EXCEPTION_BUS_ERROR` to the frame builders (`m68kcpu.h:1655/1660/1664/1668`); should be `EXCEPTION_ADDRESS_ERROR`
-      (offset 0x0C). Clean PR (5x). 
+      (offset 0x0C). DONE — pushed on `m68k-address-error-vector` (5x).
 - [ ] **DIO shared IRQ/DMAR not wired-OR** — bus drives the CPU line from the last card's raw transition; aggregate
       accessor uses `~m_bus_index` not `~(1U<<m_bus_index)` (`hp_dio.cpp:153`, `hp_dio.h:112`). Affects the 98644 IRQ
       if a slot shares a level (Codex).
