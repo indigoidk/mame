@@ -30,6 +30,7 @@ protected:
 	// device-level overrides
 	virtual void device_start() override ATTR_COLD;
 	virtual void device_reset() override ATTR_COLD;
+	virtual void device_post_load() override;   // re-drive DIO IRQ after a savestate restore
 
 	virtual ioport_constructor device_input_ports() const override ATTR_COLD;
 	// optional information overrides
@@ -48,9 +49,9 @@ private:
 	bool     m_loopback;
 	uint8_t  m_data;
 
-	// hp9k_serial fix (2026-07-16): the UART interrupt was never routed to the DIO bus, so an
-	// interrupt-driven guest (OpenBSD 2.2 dca) could not drive TX/RX past the first byte. Wire the
-	// INS8250 int -> board IC_IE gate -> selected DIO IRQ, mirroring hp98265a. See CC_HP-CDROM notes.
+	// The UART interrupt was never routed to the DIO bus, so an interrupt-driven guest (e.g. OpenBSD
+	// 2.2 'dca') could not drive TX/RX past the first byte. Wire the INS8250 int -> board IC_IE gate
+	// -> the DIP-selected DIO IRQ, mirroring hp98265a.
 	void     irq_w(int state);
 	int      get_int_level();
 	void     update_irq(bool state);
@@ -213,6 +214,14 @@ void dio16_98644_device::device_reset()
 	m_control = 0;
 	m_loopback = false;
 	m_irq_state = false;
+	update_irq(false);   // deassert all DIO IRQ lines on card reset (was left asserted across reset)
+}
+
+void dio16_98644_device::device_post_load()
+{
+	// m_irq_state is saved but the driven DIO bus line is not; re-drive it from restored state,
+	// matching irq_w's IC_IE gate so a machine restored mid-interrupt resumes correctly.
+	update_irq((m_control & 0x80) ? m_irq_state : false);
 }
 
 int dio16_98644_device::get_int_level()
