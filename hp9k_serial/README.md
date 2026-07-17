@@ -9,11 +9,22 @@ m68k register capture at faults, bringing hp300 to parity with the pmax/arc/amig
 - [x] **Phase A — serial byte path: SOLVED.** `printf HPSERBYTES > /dev/tty0` now delivers all 10 bytes to
   the host socket (was 0, then 2). Root cause was a genuine **MAME device bug** — the HP 98644 card never
   wired the INS8250 interrupt to the DIO bus — fixed in `../src/devices/bus/hp_dio/hp98644.cpp`.
-- [x] **Phase B core — bidirectional serial LOGIN console: WORKING.** RX+TX confirmed; adding a `tty0`
-  getty line to `/etc/ttys` (absent by default — it ships only `tty00-07` = the missing DCM mux) + HUP
-  init gives a real `login:` over the socket. Logged in as root, ran commands, `halt` — all over serial,
-  no natkeyboard (`phaseb_getty.py` / `.lua`). Remaining: bake the getty into the image + port the fire batch.
-- [ ] **Phase C (#2)** — MAME `-debug` m68k register hook at faults.
+- [x] **Phase B — DONE (#1 fully achieved).** (a) Bidirectional serial login console (RX+TX). (b) getty
+  baked into `obsd22_serial.chd` (persists across boots, no natkeyboard — `bake_getty.lua`). (c) reusable
+  `serial_console.py` (`SerialConsole`: boot → login → `run()` with clean `stty -echo` capture). (d) fire
+  batch ported: `fire_portmap_serial.py` fires #2 portmap AUTH_UNIX over serial and drops portmap
+  (9 svcs UP → DOWN), reproducing the finding. Any `fire_*_nk.lua` ports the same way via `run()`.
+- [ ] **Phase C (#2)** — MAME `-debug` m68k register hook at faults (not started).
+
+## Serial-console usage (the fire-batch foundation)
+```python
+from serial_console import SerialConsole
+sc = SerialConsole(log_path="s.log").boot().login()      # boots obsd22_serial.chd, getty auto-login over socket
+print(sc.run("uname -a"))                                # ('OpenBSD obsd22 2.2 GENERIC#5 hp300', 0)
+sc.run("perl -e '...fire...'"); print(sc.run("rpcinfo -p 127.0.0.1"))
+sc.halt(); sc.close()
+```
+(Minor: a cosmetic `WinError 10038` can print from the reader thread during teardown after `halt` — harmless.)
 
 ## Root cause of the 0-byte serial (confirmed: 3-reviewer panel + guest source + empirical tests)
 
