@@ -14,15 +14,19 @@ m68k register capture at faults, bringing hp300 to parity with the pmax/arc/amig
   `serial_console.py` (`SerialConsole`: boot → login → `run()` with clean `stty -echo` capture). (d) fire
   batch ported: `fire_portmap_serial.py` fires #2 portmap AUTH_UNIX over serial and drops portmap
   (9 svcs UP → DOWN), reproducing the finding. Any `fire_*_nk.lua` ports the same way via `run()`.
-- [~] **Phase C (#2) — m68k fault register capture: infrastructure done, capture-trigger WIP.** The serial
-  console reliably drives a fault (NULL write → SIGSEGV) and the hook installs; registers are readable via
-  `cpu.state[..].value` and `space:readv_u32` (virtual, MMU-aware). Remaining subtlety (documented in
-  `m68k_fault.lua`): on the 68030 a bad access is a **PMMU fault raised as a bus error that bypasses
-  `debugger_exception_hook`** (m68kcpu.h:1164 is the sole call; `EXCEPTION_BUS_ERROR` is "not emulated"),
-  so `epset 2/3` never fires. `bpset` on the vector-2/3 handler PC (`0x1A1A`, read via `readv_u32(VBR+8)`)
-  is set but its **action doesn't execute under `-debugger none`** (nor can a Lua periodic catch the paused
-  stop). Next: a debugger provider that runs actions headlessly, or `-debugger gdbstub` + a gdb client
-  (the m68k analog of the pmax gdb capture), or capture inside a custom exception path.
+- [x] **Phase C (#2) — m68k fault register capture: DONE (via `-debugger gdbstub`).** `phase_c_gdb.py` is a
+  minimal gdb-remote client: connect, fetch `target.xml` (MAME serves `g`/`p` only after that), `Z1`
+  breakpoint on the bus-error handler PC (`0x1A1A`), arm AFTER boot, fire the fault, and read
+  D0-D7/A0-A7/SR/PC + the stacked fault PC — the m68k analog of the pmax gdb capture. (Dead ends, kept in
+  `m68k_fault.lua`: the 68030 PMMU-fault bus error bypasses `debugger_exception_hook` so `epset` misses it;
+  `bpset` actions don't run under `-debugger none`.)
+- [x] **#3 (raw-disk panic): reproduced + characterized.** `phase4_panic.py` attaches a blank unlabeled
+  `rsd1` and reads `/dev/rsd1c`, capturing a kernel null-deref (`A5=0`, SR supervisor) at `FAULT_PC=0x10C26`
+  = **`_db_lookup`** (via `phase4_symbol.py`/`nm /bsd`): reading the label-less raw disk drops into DDB and
+  DDB's symbol lookup null-derefs (null in-kernel symtab). Workaround: pre-write a disklabel on the 2nd
+  disk, or use the cd9660 ISO channel.
+- [x] **#5 (DDBSER kernel): SUPERSEDED** — `-debugger gdbstub` gives m68k crash register capture with no
+  guest kernel rebuild; the DDBSER port is only needed for in-guest ddb state gdb/MAME can't provide.
 
 ## Serial-console usage (the fire-batch foundation)
 ```python
