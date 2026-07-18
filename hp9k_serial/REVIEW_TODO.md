@@ -4,6 +4,19 @@ Panel: Fable + Codex 5.6-SOL (ultra) + agy Gemini 3.1 Pro + ollama cloud (deepse
 kimi-k2.7-code). Fable + Codex read the repo/source; the rest reviewed embedded source. Convergence noted
 as (Nx). **Applied fixes** are checked; the rest is prioritized work.
 
+## 2026-07-18 (later) — HP-300 onboard-I/O block
+Ground-truthed the survey's "unmapped onboard-I/O" gap (RTC/HIL/HP-IB/DMA/framebuffer). Most of it is
+already serviced by the fixed `human_interface` card (RTC via MSM58321, HIL, internal HP-IB) and the
+video cards — the old header TODO map was stale. The one real structural gap:
+- [x] **On-board 98620 DMA missing on the 330 + 332** (`411d28f`, patch 0015). Both SPUs have a built-in
+      98620 at 0x500000 (HP 330/350 + 332 Service Manuals; real 332 boot log "98620C ... addr 0x500000");
+      MAME instantiated none, so the human_interface's internal-HP-IB DMA request (dmar0) was unserviced
+      and the boot ROM's DMA self-test hit a bus-error hole. Added as a fixed on-board device (mirrors how
+      human_interface is attached), matching 320/340/360/370. **330 now boots HP BASIC 5.1 + reports
+      "DMA-C0"; 332 reports DMA-C0; no regression.** Codex 5.6-SOL (xtra-high) + Fable APPROVE. 310/320
+      unchanged (the 98620A/B was an optional add-in card there, not built in).
+- [ ] **RTC "bad date" (8042 <-> MSM58321 read path)** — next onboard-I/O candidate.
+
 ## 2026-07-18 — accuracy review + fixes (2-model panel: Codex xtra-high + Fable, UNANIMOUS)
 Full write-up: `ACCURACY_REVIEW.md`. Fixes on `hp9k-serial-harness`, rebuilt + regression PASS.
 - [x] **hp9k3xx IRQ6 merger + DIO32 reset** (`3b139e5`) → clean upstream PR branch `hp9k3xx-reset-irq6`

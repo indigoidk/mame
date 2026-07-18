@@ -1,6 +1,6 @@
 # HP 9000/300 MAME emulation-layer fixes — patch series
 
-**14** device/CPU **accuracy fixes** for MAME's HP 9000 emulation — 13 for the HP 9000/300 (`hp9k3xx`),
+**15** device/CPU **accuracy fixes** for MAME's HP 9000 emulation — 14 for the HP 9000/300 (`hp9k3xx`),
 plus a WD2010 multi-sector fix that resolves the HP 9133 disk low-level format on the HP 9000/200
 (`hp9816a`) — discovered and resolved in the 2026-07 emulation-layer audit and adversarially verified with
 the Codex 5.6-SOL (xtra-high) + Fable review panel. Full audit incl. **negative findings** (refuted
@@ -34,6 +34,7 @@ candidates): [`../ACCURACY_REVIEW.md`](../ACCURACY_REVIEW.md).
 | 0012 | 98550/catseye per-plane IRQ | `catseye::update_int()` called the devcb with a single arg (offset 0, plane# as data) → every plane collapsed onto `m_ints` bit 0; deasserts left a stuck interrupt | pass `(plane, state)`; OR the shifted bit in `int_w`; re-evaluate on `m_intreg`/reset | `hp98550.cpp`, `catseye.cpp` |
 | 0013 | 98644 modem DIP | the "Modem line enable" DIP (SW3) was read nowhere | off ⇒ strap CTS/DSR/RI/CD asserted on the board; on ⇒ follow the RS-232 peer (per 98644A ref manual p.3-3 / Fig 12-1) | `hp98644.cpp` |
 | 0014 | wd2010 M=1 multisector (**#14104**) | the WD2010 multi-sector loop terminator tested the post-decrement sector count against 1, not 0 → transferred N−1 sectors and left the count at 1; the HP 9133 low-level format/verify never completed on `hp9816a` | test the post-decrement count against 0 → exactly N sectors (0 ⇒ 256 via the u8 wrap); single-sector (M=0) unchanged | `wd2010.cpp` |
+| 0015 | hp9k3xx on-board DMA (330/332) | the 330/332 SPUs have a built-in 98620 DMA controller at 0x500000, but the machine configs instantiated none -> the on-board HP-IB's DMA requests were unserviced and the boot ROM's DMA self-test hit a bus-error hole at 0x500000 | add the 98620 as a fixed on-board device on both (matching 320/340/360/370 which already carry it); 330 now boots HP BASIC 5.1 and reports "DMA-C0", 332 reports DMA-C0 | `hp9k_3xx.cpp` |
 
 ## Provenance
 

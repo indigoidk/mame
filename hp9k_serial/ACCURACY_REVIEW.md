@@ -19,6 +19,7 @@ Fable dumping the Rev C boot ROM ID table locally to settle the 98644 ID questio
 | `f5fccee` | **C1** correct/clarify the bus-error read flag (dead-arg cleanup) | `hp9k_3xx.cpp` | built; no behavioral change |
 | `e89a2ac` | **B7** drop the redundant second `scsi_disconnect` on bus-free | `mb87030.cpp` | built + regression PASS |
 | `c9fbd41` | **C3** 98644 ID → native 0x42 (was 0x02); **B4** remove the fake loopback shadow | `hp98644.cpp` | built + regression PASS (getty @0x42, kernel console @0xC2); **stacked PR branch `hp98644-register-truing`** off `hp98644-dio-irq` |
+| `411d28f` | **onboard-I/O** add the on-board 98620 DMA to the 330 + 332 (built-in at 0x500000, was an unserviced bus-error hole); rewrite the stale internal-I/O map | `hp9k_3xx.cpp` | built + verified (330 boots BASIC 5.1 + "DMA-C0"; 332 "DMA-C0"); **Codex+Fable APPROVE** |
 
 Binary: rebuilt `hp9k_patched_0288.exe` (old → `.bak-preResetIrq6`). **Regression PASS**
 (`regress_dio_wiredor.py`): hp9k360/OpenBSD 2.2 boots to a serial login — which *requires* the 250 kHz
