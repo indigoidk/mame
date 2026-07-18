@@ -35,6 +35,9 @@ found in an **OpenBSD 2.2 audit** (multi-model review — Codex 5.6-SOL + Fable)
 Each is built into a native hp9k binary and regression-verified; review verdicts were unanimous (refuted
 candidates are in the audit).
 
+**Also** — `wd2010`: an M=1 multi-sector transfer fix (off-by-one) resolves the HP 9133 low-level format
+hang on the HP 9000/200 (`hp9816a`) — [#14104](https://github.com/mamedev/mame/issues/14104).
+
 ---
 
 # MAME
