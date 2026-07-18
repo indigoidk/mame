@@ -13,7 +13,6 @@ EXCEPTION_ADDRESS_ERROR; the 68000 group-0 frame (m68ki_stack_frame_buserr) is u
 Validated: hp9k360/OpenBSD 2.2 still boots + reads a raw disk over serial (no bus-error regression).
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_015NLjugzo1VuKK1UeMfKFQa
 ---
  src/devices/cpu/m68000/m68kcpu.h | 11 +++++++----
  1 file changed, 7 insertions(+), 4 deletions(-)

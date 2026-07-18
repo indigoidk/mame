@@ -21,7 +21,6 @@ dca.c sc_cua open-deadlock). Root-caused via a 3-model review panel
 (Fable + Codex 5.6-SOL + agy Gemini 3.1 Pro) + guest source + MAME-debugger injection.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_015NLjugzo1VuKK1UeMfKFQa
 ---
  src/devices/bus/hp_dio/hp98644.cpp | 48 +++++++++++++++++++++++++++---
  1 file changed, 44 insertions(+), 4 deletions(-)

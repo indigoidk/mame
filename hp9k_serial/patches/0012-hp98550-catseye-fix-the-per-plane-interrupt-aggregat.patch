@@ -15,7 +15,6 @@ own bit. Also re-evaluate the line after m_ints/m_intreg change
 (device_reset and the intreg write) so a stale interrupt is dropped.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
 ---
  src/devices/bus/hp_dio/hp98550.cpp |  5 ++++-
  src/devices/video/catseye.cpp      | 11 ++++++-----

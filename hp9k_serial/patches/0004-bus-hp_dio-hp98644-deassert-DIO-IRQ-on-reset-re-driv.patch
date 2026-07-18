@@ -14,7 +14,6 @@ restored state after a savestate load (m_irq_state is saved but the driven bus l
 irq_w's IC_IE gate. Also de-internalize the routing comment for upstream.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_015NLjugzo1VuKK1UeMfKFQa
 ---
  src/devices/bus/hp_dio/hp98644.cpp | 15 ++++++++++++---
  1 file changed, 12 insertions(+), 3 deletions(-)

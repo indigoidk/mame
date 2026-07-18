@@ -19,7 +19,6 @@ guard was a bus-self-input exclusion made redundant by aggregate driving and
 is removed with an explanatory comment. Shifts use 1U with bounds asserts.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01B8KfCTTuA74HNkqHhVcxdb
 ---
  src/devices/bus/hp_dio/hp_dio.cpp | 101 ++++++++++++++++--------------
  src/devices/bus/hp_dio/hp_dio.h   |  26 ++++----

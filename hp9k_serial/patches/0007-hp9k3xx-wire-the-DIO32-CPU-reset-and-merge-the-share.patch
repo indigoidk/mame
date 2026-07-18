@@ -25,7 +25,6 @@ Validated: hp9k360 / OpenBSD 2.2 still boots to multiuser over serial
 the merger) and dca0 at ipl 5 round-trips.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
 ---
  src/mame/hp/hp9k_3xx.cpp | 16 ++++++++++++++--
  1 file changed, 14 insertions(+), 2 deletions(-)

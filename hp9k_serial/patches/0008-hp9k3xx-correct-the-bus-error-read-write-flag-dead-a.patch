@@ -17,7 +17,6 @@ parameter to `read`, make all four handlers pass it correctly, and note
 why it is otherwise dead. No behavioral change.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
 ---
  src/mame/hp/hp9k_3xx.cpp | 12 ++++++++----
  1 file changed, 8 insertions(+), 4 deletions(-)

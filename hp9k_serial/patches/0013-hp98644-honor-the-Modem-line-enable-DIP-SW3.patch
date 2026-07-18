@@ -18,7 +18,6 @@ dial-in path needs). Validated: hp9k360 / OpenBSD 2.2 still boots to a
 serial login with the default (off) DIP.
 
 Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
-Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
 ---
  src/devices/bus/hp_dio/hp98644.cpp | 26 ++++++++++++++++++++++----
  1 file changed, 22 insertions(+), 4 deletions(-)
