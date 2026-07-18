@@ -4,6 +4,23 @@ Panel: Fable + Codex 5.6-SOL (ultra) + agy Gemini 3.1 Pro + ollama cloud (deepse
 kimi-k2.7-code). Fable + Codex read the repo/source; the rest reviewed embedded source. Convergence noted
 as (Nx). **Applied fixes** are checked; the rest is prioritized work.
 
+## 2026-07-18 — accuracy review + fixes (2-model panel: Codex xtra-high + Fable, UNANIMOUS)
+Full write-up: `ACCURACY_REVIEW.md`. Fixes on `hp9k-serial-harness`, rebuilt + regression PASS.
+- [x] **hp9k3xx IRQ6 merger + DIO32 reset** (`3b139e5`) → clean upstream PR branch `hp9k3xx-reset-irq6`
+      (off master, cherry-pick `ee31ff9`). PTM+DIO IRQ6 through `INPUT_MERGER_ANY_HIGH`; DIO32 `reset_cb`
+      wired (per-card `reset_in` propagation deferred to its own PR).
+- [x] **bus-error read/write flag** (`f5fccee`) → the "unmapped-read tagged as write -> corrupts SSW R/W"
+      ARCH item below is **REFUTED as a live defect** (dead on every hp9k3xx CPU: 010+ frames source R/W
+      from the CPU temps, re-snapshotted at BUSERROR service; only fault_addr survives). Cleaned up anyway.
+- [x] **mb87030 redundant double scsi_disconnect** (`e89a2ac`) — benign, added a `return`.
+- **CONFIRMED by the panel, HELD for the user's go:** 98644 ID polarity is INVERTED (native = **0x42**,
+      not 0x02 — Fable dumped the Rev C boot ROM ID table: `42`="HP98644", `02`="HP98626"; dca accepts both
+      so the serial console is unaffected); 98644 loopback shadow (delete, use ins8250 LOOP, regression-test
+      the boot self-test); 98620 reset incomplete (clear control/ARM/INT + level 3, PRESERVE address/TC);
+      98550 per-plane IRQ stomp (root is `catseye.cpp` single-arg devcb — fix touches catseye.cpp + hp98550.cpp).
+- **Campaign L4 reconciled:** the raw-disk "panic" was the UNPATCHED mame.exe; patched binary + serial
+      console = 0 panics (`panic_hunt.py`). Rig fix: `hp300_fire.py` + `HP300_FIRE_RECIPE.md`.
+
 ## 2026-07-17 — done this session (pushed)
 - **`monitor epset` over gdbstub: VALIDATED.** `epset 2`/`epset 3` (set via qRcmd -> execute_command,
   debuggdbstub.cpp:1293) halt under `-debugger gdbstub` and report a stop, and halt at the handler
