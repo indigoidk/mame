@@ -44,15 +44,13 @@
 
   All models have an MC6840 PIT on IRQ6 clocked at 250 kHz.
 
-  TODO:
-    BBCADDR   0x420000
-    RTC_DATA: 0x420001
-    RTC_CMD:  0x420003
-    HIL:      0x428000
-    HPIB:     0x470000
-    KBDNMIST: 0x478005
-    DMA:      0x500000
-    FRAMEBUF: 0x560000
+  I/O regions serviced by the DIO devices (the human_interface and the 330/332 DMA are fixed on-board;
+  the video is a normal, swappable DIO card):
+    0x200000-0x2fffff  bit-mapped frame buffer / VRAM                                   [video card, e.g. 98544]
+    0x420000-0x420003  8042 "BBC" master port: RTC (MSM58321), HP-HIL, keyboard, beeper [human_interface]
+    0x470000-0x47ffff  internal HP-IB (TMS9914) + control; KBDNMIST (0x478005) via mirror [human_interface]
+    0x500000-0x50020f  98620 DMA controller (on-board on 330/332/360+; optional card on 310/320) [hp98620]
+    0x560000-0x567fff  video ROM + control registers                                    [video card]
 
     6840:     0x5F8001/3/5/7/9, IRQ 6
 
@@ -378,6 +376,13 @@ void hp9k3xx_state::hp9k330(machine_config &config)
 	DIO32_SLOT(config, "sl2", "diobus", dio16_cards, "98603b", false);
 	DIO32_SLOT(config, "sl3", "diobus", dio16_cards, "98644", false);
 	DIO32_SLOT(config, "sl4", "diobus", dio16_cards, nullptr, false);
+
+	// On-board 98620 DMA controller: built-in/standard on the 330 SPU, mapped at 0x500000 in the
+	// internal-I/O region (HP 330/350 Service Manual, "Built-in DMA").  Fixed like the other on-board
+	// devices so it is always present to service the human-interface's HP-IB DMA requests (dmar0).
+	// (Modelled device is the 98620C superset; the 330's built-in DMA was 98620B-class.  "98620" is
+	// registered only in dio32_cards, unlike the sibling sl0-sl4 which use dio16_cards.)
+	DIO32_SLOT(config, "dma", "diobus", dio32_cards, "98620", true);
 }
 
 void hp9k3xx_state::hp9k332(machine_config &config)
@@ -393,6 +398,13 @@ void hp9k3xx_state::hp9k332(machine_config &config)
 	DIO16_SLOT(config, "sl2", "diobus", dio16_cards, "98644", false);
 	DIO16_SLOT(config, "sl3", "diobus", dio16_cards, "98543", false);
 	DIO16_SLOT(config, "sl4", "diobus", dio16_cards, nullptr, false);
+
+	// On-board 98620 DMA controller: built-in/standard on the 332 SPU (a 98620C reported by real
+	// hardware as "98620C, 2 channels, 32-bit DMA" at 0x500000 -- HP 332 Service Manual, "Two channel
+	// DMA Controller").  Fixed on-board device; services the human-interface's HP-IB DMA requests.
+	// (dio32_cards is used only because "98620" is registered there; safe on this fixed DIO16 slot --
+	// only the 98620 default, itself a dio16 card, is ever instantiated.)
+	DIO16_SLOT(config, "dma", "diobus", dio32_cards, "98620", true);
 }
 
 void hp9k3xx_state::hp9k340(machine_config &config)
