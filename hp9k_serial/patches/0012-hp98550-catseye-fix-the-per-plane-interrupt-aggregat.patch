@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Sat, 18 Jul 2026 13:00:32 -0500
+Subject: [PATCH 12/13] hp98550/catseye: fix the per-plane interrupt
+ aggregation
+
+catseye_device::update_int() invoked the devcb_write8 with a single
+argument (m_int_write_func(m_plane) / (0)), which supplies offset 0 with
+the plane number as data. In dio32_98550_device::int_w(offset,data) that
+collapsed every plane's interrupt onto bit 0 -- plane 0 could not assert,
+planes >= 2 ORed their index into m_ints, and any deassert cleared only
+bit 0, leaving a stuck interrupt. Pass the plane as the offset and the
+level as the data, and OR the shifted bit in int_w so each plane owns its
+own bit. Also re-evaluate the line after m_ints/m_intreg change
+(device_reset and the intreg write) so a stale interrupt is dropped.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
+---
+ src/devices/bus/hp_dio/hp98550.cpp |  5 ++++-
+ src/devices/video/catseye.cpp      | 11 ++++++-----
+ 2 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/src/devices/bus/hp_dio/hp98550.cpp b/src/devices/bus/hp_dio/hp98550.cpp
+index aa9430e98d0..6fac7030f57 100644
+--- a/src/devices/bus/hp_dio/hp98550.cpp
++++ b/src/devices/bus/hp_dio/hp98550.cpp
+@@ -164,6 +164,7 @@ void dio32_98550_device::device_reset()
+ {
+ 	m_intreg = 0;
+ 	m_ints = 0;
++	update_int();   // deassert any DIO IRQ this card was asserting
+ }
+ 
+ uint16_t dio32_98550_device::rom_r(offs_t offset, uint16_t mem_mask)
+@@ -185,6 +186,7 @@ void dio32_98550_device::rom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
+ 
+ 	case 1:
+ 		m_intreg = data;
++		update_int();   // the interrupt enable/level lives in m_intreg -> re-evaluate the line
+ 		break;
+ 
+ 	default:
+@@ -236,7 +238,8 @@ void dio32_98550_device::int_w(offs_t offset, uint8_t data)
+ {
+ 	LOG("%s: plane%d = %s\n", __func__, offset, data ? "assert" : "deassert");
+ 	m_ints &= ~(1 << offset);
+-	m_ints |= data;
++	if (data)
++		m_ints |= (1 << offset);
+ 	update_int();
+ }
+ 
+diff --git a/src/devices/video/catseye.cpp b/src/devices/video/catseye.cpp
+index 11ca2677475..48c5105b833 100644
+--- a/src/devices/video/catseye.cpp
++++ b/src/devices/video/catseye.cpp
+@@ -151,11 +151,12 @@ void catseye_device::device_reset()
+ void catseye_device::update_int()
+ {
+ 	LOG("%s: pending %d, enabled %d\n", __func__, m_wm_int_pending, m_wm_int_enable);
+-	if ((m_wm_int_enable && m_wm_int_pending ) ||
+-		(m_vblank_int_enable && m_vblank_int_pending))
+-		m_int_write_func(m_plane);
+-	else
+-		m_int_write_func(0);
++	bool const state = (m_wm_int_enable && m_wm_int_pending) ||
++		(m_vblank_int_enable && m_vblank_int_pending);
++	// Pass the plane as the write offset and the level as the data so the consumer can keep a correct
++	// per-plane interrupt bitmap.  (The single-argument form supplied offset 0 with the plane number
++	// as data, collapsing every plane onto bit 0 and leaving deassertions stuck.)
++	m_int_write_func(m_plane, state ? 1 : 0);
+ }
+ 
+ TIMER_CALLBACK_MEMBER(catseye_device::blink_callback)

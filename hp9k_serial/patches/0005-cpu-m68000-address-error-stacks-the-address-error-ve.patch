@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Fri, 17 Jul 2026 06:45:16 -0500
+Subject: [PATCH 05/13] cpu/m68000: address error stacks the address-error
+ vector (3), not bus-error (2)
+
+m68ki_exception_address_error() initializes the exception as EXCEPTION_ADDRESS_ERROR and jumps to
+vector 3, but passed EXCEPTION_BUS_ERROR to the four stack-frame builders, so the frame's format/
+vector word encoded offset 0x008 (bus error) instead of 0x00C (address error) on the 010/020/030/
+040/070. A guest handler that reads the stacked vector offset saw the wrong fault type. Pass
+EXCEPTION_ADDRESS_ERROR; the 68000 group-0 frame (m68ki_stack_frame_buserr) is unaffected.
+
+Validated: hp9k360/OpenBSD 2.2 still boots + reads a raw disk over serial (no bus-error regression).
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_015NLjugzo1VuKK1UeMfKFQa
+---
+ src/devices/cpu/m68000/m68kcpu.h | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
+
+diff --git a/src/devices/cpu/m68000/m68kcpu.h b/src/devices/cpu/m68000/m68kcpu.h
+index 33f2916112b..965331597f0 100644
+--- a/src/devices/cpu/m68000/m68kcpu.h
++++ b/src/devices/cpu/m68000/m68kcpu.h
+@@ -1644,6 +1644,9 @@ inline void m68ki_exception_address_error()
+ 
+ 	m_run_mode = RUN_MODE_BERR_AERR_RESET_WSF;
+ 
++	// The vector encoded into the stacked format/vector word must match the exception actually taken
++	// (address error -> vector 3, offset 0x00C), consistent with m68ki_jump_vector() below; passing
++	// EXCEPTION_BUS_ERROR here previously mis-stamped the frame as a bus error (offset 0x008).
+ 	if (CPU_TYPE_IS_000())
+ 	{
+ 		/* Note: This is implemented for 68000 only! */
+@@ -1652,20 +1655,20 @@ inline void m68ki_exception_address_error()
+ 	else if (CPU_TYPE_IS_010())
+ 	{
+ 		/* only the 68010 throws this unique type-1000 frame */
+-		m68ki_stack_frame_1000(m_ppc, sr, EXCEPTION_BUS_ERROR, m_mmu_tmp_buserror_address);
++		m68ki_stack_frame_1000(m_ppc, sr, EXCEPTION_ADDRESS_ERROR, m_mmu_tmp_buserror_address);
+ 	}
+ 	else if (CPU_TYPE_IS_070())
+ 	{
+ 		/* only the 68070 throws this unique type-1111 frame */
+-		m68ki_stack_frame_1111(m_ppc, sr, EXCEPTION_BUS_ERROR, m_mmu_tmp_buserror_address);
++		m68ki_stack_frame_1111(m_ppc, sr, EXCEPTION_ADDRESS_ERROR, m_mmu_tmp_buserror_address);
+ 	}
+ 	else if (m_mmu_tmp_buserror_address == m_ppc)
+ 	{
+-		m68ki_stack_frame_1010(sr, EXCEPTION_BUS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
++		m68ki_stack_frame_1010(sr, EXCEPTION_ADDRESS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
+ 	}
+ 	else
+ 	{
+-		m68ki_stack_frame_1011(sr, EXCEPTION_BUS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
++		m68ki_stack_frame_1011(sr, EXCEPTION_ADDRESS_ERROR, m_ppc, m_mmu_tmp_buserror_address);
+ 	}
+ 
+ 	m68ki_jump_vector(EXCEPTION_ADDRESS_ERROR);

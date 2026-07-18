@@ -1,0 +1,191 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Fri, 17 Jul 2026 14:19:08 -0500
+Subject: [PATCH 06/13] bus/hp_dio: wired-OR the shared DIO IRQ and DMAR lines
+
+set_irq() drove the CPU interrupt callback with the raising/lowering card's
+raw state instead of the OR of all cards on that level, so on a shared level
+one card releasing its line dropped another card's still-asserted interrupt
+(e.g. the 98643 LAN and 98644 serial both default to level 5 on hp9k320).
+set_dmar() had the identical bug: it fanned out each requester's raw state to
+the other cards, so the 98620 DMA controller (which caches the last dmarN_in)
+saw a shared DMAR request drop while another card still asserted it.
+
+Both now maintain the per-source bitmap and drive the aggregate wired-OR line,
+notifying consumers only on a real line transition. The pull accessors used
+`m_irq[level] & ~m_bus_index` (an index-used-as-mask error that masked out
+real card bits); they now return the true OR. The `m_bus_index != index`
+guard was a bus-self-input exclusion made redundant by aggregate driving and
+is removed with an explanatory comment. Shifts use 1U with bounds asserts.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01B8KfCTTuA74HNkqHhVcxdb
+---
+ src/devices/bus/hp_dio/hp_dio.cpp | 101 ++++++++++++++++--------------
+ src/devices/bus/hp_dio/hp_dio.h   |  26 ++++----
+ 2 files changed, 67 insertions(+), 60 deletions(-)
+
+diff --git a/src/devices/bus/hp_dio/hp_dio.cpp b/src/devices/bus/hp_dio/hp_dio.cpp
+index 277cd899bf2..9fd21e0cf8c 100644
+--- a/src/devices/bus/hp_dio/hp_dio.cpp
++++ b/src/devices/bus/hp_dio/hp_dio.cpp
+@@ -152,68 +152,75 @@ unsigned dio16_device::add_card(device_dio16_card_interface &card)
+ 
+ void dio16_device::set_irq(unsigned index, unsigned int level, int state)
+ {
+-	bool const changed(bool(state) != BIT(m_irq[level], index));
+-	if (!changed)
+-		return;
++	assert(level < 7);
++	assert(index < 8U * sizeof(m_irq[level]));   // bit index must fit the source bitmap
++
++	u16 &sources = m_irq[level];
++	u16 const mask = u16(1U << index);
++	bool const asserted = bool(state);
++
++	if (asserted == bool(sources & mask))
++		return;                                  // this source's contribution is unchanged
+ 
+-	if (state)
+-		m_irq[level] |= (1 << index);
++	bool const old_line = bool(sources);
++	if (asserted)
++		sources |= mask;
+ 	else
+-		m_irq[level] &= ~(1 << index);
+-
+-	if (m_bus_index != index) {
+-		switch (level) {
+-		case 0:
+-			m_irq1_out_cb(state);
+-			break;
+-		case 1:
+-			m_irq2_out_cb(state);
+-			break;
+-		case 2:
+-			m_irq3_out_cb(state);
+-			break;
+-		case 3:
+-			m_irq4_out_cb(state);
+-			break;
+-		case 4:
+-			m_irq5_out_cb(state);
+-			break;
+-		case 5:
+-			m_irq6_out_cb(state);
+-			break;
+-		case 6:
+-			m_irq7_out_cb(state);
+-			break;
+-		}
++		sources &= u16(~mask);
++
++	// Open-collector wired-OR: the DIO interrupt line is asserted while ANY source asserts
++	// it (bus cards, or the bus's own irqN_in pins at bit m_bus_index) and released only
++	// when the last source releases.  Propagate real line transitions only.
++	// (The former "& ~m_bus_index" masked out real card bits -- an index-used-as-mask bug.)
++	bool const new_line = bool(sources);
++	if (new_line == old_line)
++		return;
++
++	int const line = new_line ? ASSERT_LINE : CLEAR_LINE;
++	switch (level) {
++	case 0: m_irq1_out_cb(line); break;
++	case 1: m_irq2_out_cb(line); break;
++	case 2: m_irq3_out_cb(line); break;
++	case 3: m_irq4_out_cb(line); break;
++	case 4: m_irq5_out_cb(line); break;
++	case 5: m_irq6_out_cb(line); break;
++	case 6: m_irq7_out_cb(line); break;
+ 	}
+ }
+ 
+ void dio16_device::set_dmar(unsigned int index, unsigned int num, int state)
+ {
+-	assert(num <= 1);
++	assert(num < 2);
++	assert(index < 8U * sizeof(m_dmar[num]));
+ 
+-	bool const changed(bool(state) != BIT(m_dmar[num], index));
+-	if (!changed)
++	u16 &sources = m_dmar[num];
++	u16 const mask = u16(1U << index);
++	bool const asserted = bool(state);
++
++	if (asserted == bool(sources & mask))
+ 		return;
+-	if (state)
+-		m_dmar[num] |= (1 << index);
++
++	bool const old_line = bool(sources);
++	if (asserted)
++		sources |= mask;
+ 	else
+-		m_dmar[num] &= ~(1 << index);
++		sources &= u16(~mask);
+ 
++	// DMAR is a shared wired-OR request line (DMACK is the separate point-to-point path).
++	// Deliver the aggregate line on a real transition; skipping the originator (no
++	// self-loopback) stays correct because only the determining source flips the line.
++	bool const new_line = bool(sources);
++	if (new_line == old_line)
++		return;
+ 
++	int const line = new_line ? ASSERT_LINE : CLEAR_LINE;
+ 	for (auto &card : m_cards) {
+-
+ 		if (card->get_index() == index)
+ 			continue;
+-
+-		switch (num) {
+-		case 0:
+-			card->dmar0_in(state);
+-			break;
+-		case 1:
+-			card->dmar1_in(state);
+-			break;
+-		}
++		if (num == 0)
++			card->dmar0_in(line);
++		else
++			card->dmar1_in(line);
+ 	}
+ }
+ 
+diff --git a/src/devices/bus/hp_dio/hp_dio.h b/src/devices/bus/hp_dio/hp_dio.h
+index bab9a06ae79..2fbb4e87b8a 100644
+--- a/src/devices/bus/hp_dio/hp_dio.h
++++ b/src/devices/bus/hp_dio/hp_dio.h
+@@ -108,19 +108,19 @@ public:
+ 	void irq7_in(int state) { set_irq(m_bus_index, 6, state); }
+ 	void reset_in(int state);
+ 
+-	// output lines
+-	int irq1_out() const { return (m_irq[0] & ~m_bus_index) ? 1 : 0; }
+-	int irq2_out() const { return (m_irq[1] & ~m_bus_index) ? 1 : 0; }
+-	int irq3_out() const { return (m_irq[2] & ~m_bus_index) ? 1 : 0; }
+-	int irq4_out() const { return (m_irq[3] & ~m_bus_index) ? 1 : 0; }
+-	int irq5_out() const { return (m_irq[4] & ~m_bus_index) ? 1 : 0; }
+-	int irq6_out() const { return (m_irq[5] & ~m_bus_index) ? 1 : 0; }
+-	int irq7_out() const { return (m_irq[6] & ~m_bus_index) ? 1 : 0; }
+-	int dmar0_out() const { return dmar0_r(); }
+-	int dmar1_out() const { return dmar1_r(); }
+-
+-	bool dmar0_r() const { return (m_dmar[0] & ~m_bus_index) ? 1 : 0; }
+-	bool dmar1_r() const { return (m_dmar[1] & ~m_bus_index) ? 1 : 0; }
++	// output lines -- wired-OR aggregate of every source on the line
++	int irq1_out() const { return (m_irq[0] != 0) ? 1 : 0; }
++	int irq2_out() const { return (m_irq[1] != 0) ? 1 : 0; }
++	int irq3_out() const { return (m_irq[2] != 0) ? 1 : 0; }
++	int irq4_out() const { return (m_irq[3] != 0) ? 1 : 0; }
++	int irq5_out() const { return (m_irq[4] != 0) ? 1 : 0; }
++	int irq6_out() const { return (m_irq[5] != 0) ? 1 : 0; }
++	int irq7_out() const { return (m_irq[6] != 0) ? 1 : 0; }
++	int dmar0_out() const { return dmar0_r() ? 1 : 0; }
++	int dmar1_out() const { return dmar1_r() ? 1 : 0; }
++
++	bool dmar0_r() const { return m_dmar[0] != 0; }
++	bool dmar1_r() const { return m_dmar[1] != 0; }
+ 
+ 	uint8_t dmack_r_out(int index, int channel);
+ 	void dmack_w_out(int index, int channel, uint8_t data);

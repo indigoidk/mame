@@ -1,0 +1,71 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Sat, 18 Jul 2026 13:00:31 -0500
+Subject: [PATCH 11/13] hp98620: disarm the DMA channels and drop the IRQ on
+ reset
+
+device_reset() only cleared two otherwise-unused members, leaving the
+per-channel DMA state (armed/address/tc/control/irq/ie/level) and the
+driven DIO IRQ untouched, so a reset could leave a channel armed and an
+interrupt asserted. Clear each channel's control/interrupt state to the
+98620C power-up values (interrupts disabled, byte mode, priority 0, IRQ
+level 3, disarmed) and call update_irq(); the address and transfer-count
+registers are preserved per the 98620C spec. The REG_GENERAL_CONTROL
+channel-reset path likewise cleared only ARM -- also clear the interrupt
+and re-evaluate the line.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
+---
+ src/devices/bus/hp_dio/hp98620.cpp | 26 ++++++++++++++++++++++++--
+ 1 file changed, 24 insertions(+), 2 deletions(-)
+
+diff --git a/src/devices/bus/hp_dio/hp98620.cpp b/src/devices/bus/hp_dio/hp98620.cpp
+index 5f49ca9496d..551dd470e76 100644
+--- a/src/devices/bus/hp_dio/hp98620.cpp
++++ b/src/devices/bus/hp_dio/hp98620.cpp
+@@ -198,6 +198,24 @@ void dio16_98620_device::device_reset()
+ 	}
+ 	m_control = 0;
+ 	m_irq_state = false;
++
++	// A hardware reset disarms both DMA channels and clears their control/interrupt state (power-up
++	// control = interrupts disabled, byte mode, priority 0, IRQ level 3); the address and
++	// transfer-count registers are preserved (HP 98620C spec).
++	for (auto &r : m_regs) {
++		r.control = 0;
++		r.armed = false;
++		r.irq = false;
++		r.ie = false;
++		r.irq_level = 3;
++		r.tsz = 1;
++		r.subcount = 0;
++		r.dma_out = false;
++		r.dma_pri = false;
++		r.lword = false;
++		r.word = false;
++	}
++	update_irq();   // withdraw any DIO IRQ this card was still asserting
+ }
+ 
+ uint16_t dio16_98620_device::dma_r(offs_t offset)
+@@ -387,13 +405,17 @@ void dio16_98620_device::dma_w(offs_t offset, uint16_t data)
+ 		break;
+ 
+ 	case REG_GENERAL_CONTROL:
++		// A channel reset clears ARM and the interrupt (status -> 0), preserving address/count.
+ 		if (data & REG_GENERAL_CONTROL_RESET0) {
+-			m_regs[0].armed = 0;
++			m_regs[0].armed = false;
++			m_regs[0].irq = false;
+ 		}
+ 
+ 		if (data & REG_GENERAL_CONTROL_RESET1) {
+-			m_regs[1].armed = 0;
++			m_regs[1].armed = false;
++			m_regs[1].irq = false;
+ 		}
++		update_irq();
+ 		break;
+ 
+ 	case REG0_1TQ4_CONTROL:

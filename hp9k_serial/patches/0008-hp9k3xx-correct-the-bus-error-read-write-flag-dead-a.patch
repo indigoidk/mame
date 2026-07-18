@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Sat, 18 Jul 2026 12:18:05 -0500
+Subject: [PATCH 08/13] hp9k3xx: correct the bus-error read/write flag
+ (dead-arg cleanup)
+
+set_bus_error()'s middle argument is forwarded to
+m68000_musashi_device::set_buserror_details(), whose contract is
+rw = 1 for read, 0 for write. The four bus-error handlers passed it
+inconsistently (buserror16_r -> true, buserror_r -> false) and the
+32-bit read path was wrong. It has no observable effect today: on the
+68010/020/030/040 the stacked frame's R/W comes from the CPU's own
+access temporaries (and is re-snapshotted when the deferred BUSERROR
+line is serviced), so the argument only reaches a guest via the 68000
+group-0 frame, and no hp9k3xx model is a plain 68000. Rename the
+parameter to `read`, make all four handlers pass it correctly, and note
+why it is otherwise dead. No behavioral change.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
+---
+ src/mame/hp/hp9k_3xx.cpp | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/mame/hp/hp9k_3xx.cpp b/src/mame/hp/hp9k_3xx.cpp
+index ec4058e268c..0fa338b1136 100644
+--- a/src/mame/hp/hp9k_3xx.cpp
++++ b/src/mame/hp/hp9k_3xx.cpp
+@@ -108,7 +108,7 @@ private:
+ 
+ 	output_finder<8> m_diag_led;
+ 
+-	void set_bus_error(uint32_t address, bool write, uint16_t mem_mask);
++	void set_bus_error(uint32_t address, bool read, uint16_t mem_mask);
+ 
+ 	uint16_t buserror16_r(offs_t offset, uint16_t mem_mask = ~0);
+ 	void buserror16_w(offs_t offset, uint16_t data, uint16_t mem_mask = ~0);
+@@ -283,7 +283,7 @@ void hp9k3xx_state::add_dio32_bus(machine_config &config)
+ 	dio32.irq7_out_cb().set(FUNC(hp9k3xx_state::dio_irq7_w));
+ }
+ 
+-void hp9k3xx_state::set_bus_error(uint32_t address, bool rw, uint16_t mem_mask)
++void hp9k3xx_state::set_bus_error(uint32_t address, bool read, uint16_t mem_mask)
+ {
+ 	if (m_maincpu->m68851_buserror(address))
+ 		return;
+@@ -292,7 +292,11 @@ void hp9k3xx_state::set_bus_error(uint32_t address, bool rw, uint16_t mem_mask)
+ 		return;
+ 
+ 	m_bus_error = true;
+-	m_maincpu->set_buserror_details(address, rw, m_maincpu->get_fc());
++	// set_buserror_details() takes rw as 1=read/0=write.  On the 68010/020/030/040 the stacked
++	// frame's R/W is sourced from the CPU's own access temporaries, so this argument only reaches
++	// a guest through the 68000 group-0 frame -- and no hp9k3xx model is a plain 68000 -- but keep
++	// it correct so a future 68000-based board (or a core change) can't inherit a real bug.
++	m_maincpu->set_buserror_details(address, read, m_maincpu->get_fc());
+ 	m_maincpu->set_input_line(M68K_LINE_BUSERROR, ASSERT_LINE);
+ 	m_bus_error_timer->adjust(m_maincpu->cycles_to_attotime(16)); // let rmw cycles complete
+ }
+@@ -313,7 +317,7 @@ void hp9k3xx_state::buserror16_w(offs_t offset, uint16_t data, uint16_t mem_mask
+ uint32_t hp9k3xx_state::buserror_r(offs_t offset, uint32_t mem_mask)
+ {
+ 	if (!machine().side_effects_disabled())
+-		set_bus_error(offset << 2, false, mem_mask);
++		set_bus_error(offset << 2, true, mem_mask);
+ 	return 0xffffffff;
+ }
+ 

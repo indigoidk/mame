@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Sat, 18 Jul 2026 12:18:06 -0500
+Subject: [PATCH 09/13] mb87030: drop the redundant second scsi_disconnect on
+ bus-free
+
+When the initiator is connected and the bus goes fully free, the
+bus-free monitor at the top of step() calls scsi_disconnect() (which
+moves the SPC to Idle), then the switch below re-enters case
+State::Idle and, if PCTL_BUS_FREE_IE is set, calls scsi_disconnect()
+again in the same step(). It is idempotent (scsi_disconnect() assigns
+INTS_DISCONNECTED and parks in Idle), so this is not a functional
+fault, but the second call is pointless. Return right after the monitor
+fires so the Idle case doesn't repeat it.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
+---
+ src/devices/machine/mb87030.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/devices/machine/mb87030.cpp b/src/devices/machine/mb87030.cpp
+index c9f755c926a..adc9fdd9ec7 100644
+--- a/src/devices/machine/mb87030.cpp
++++ b/src/devices/machine/mb87030.cpp
+@@ -318,6 +318,9 @@ void mb87030_device::step(bool timeout)
+ 		LOG("SCSI disconnect\n");
+ 		scsi_disconnect();
+ 		scsi_set_ctrl(0, S_ALL);
++		// scsi_disconnect() already moved the SPC to Idle; return so the switch below does not
++		// re-enter the State::Idle bus-free path and issue a second, redundant scsi_disconnect().
++		return;
+ 	}
+ 
+ 	switch (m_state) {

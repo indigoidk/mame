@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Thu, 9 Jul 2026 14:21:20 -0500
+Subject: [PATCH 01/13] nscsi: clear stored IDENTIFY at new selection (stale
+ LUN leaked across nexuses)
+
+nscsi_full_device latches the IDENTIFY message (m_scsi_identify) and clears it
+only at device/bus reset. Per SCSI-2 6.6.1 the IDENTIFY establishes the I_T_L
+nexus for that connection only; a selection without an IDENTIFY message
+addresses LUN 0 (or the CDB LUN).
+
+Because the latch survives bus-free, a stale LUN leaks into later connections.
+Repro: the HP 9000/300 boot ROM LUN-scans a target (IDENTIFY 0x80|7 latched);
+OpenBSD 2.2's pre-SCSI-2 oscsi driver then selects without ATN, get_lun()
+returns 7, INQUIRY answers type 0x7f, and the disk never attaches:
+"type 0x7f, qual 0x0, ver 5 at oscsi0 targ 0 lun 0 not configured". Affects any
+nscsi machine whose guest selects without IDENTIFY.
+
+Fix: clear m_scsi_identify when the target detects a new selection (nexus
+boundary, IDLE case in step()). Initiators that send IDENTIFY re-latch it in
+MESSAGE OUT before any get_lun() consumer runs.
+
+Verified: OpenBSD 2.2/hp9k360 disk attaches (INQUIRY -> READ CAPACITY -> MODE
+SENSE), WRITE(10)/READ(10) round-trip to the CHD; HP-UX 9 (IDENTIFY per command)
+boots byte-identical to the unpatched build.
+
+This change was developed with AI assistance (Anthropic Claude, Fable 5, model
+claude-fable-5) for root-cause analysis and drafting; all behavior was verified
+by live emulator runs as described above.
+---
+ src/devices/machine/nscsi_hle.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/devices/machine/nscsi_hle.cpp b/src/devices/machine/nscsi_hle.cpp
+index 83d9ec61383..b2d92282667 100644
+--- a/src/devices/machine/nscsi_hle.cpp
++++ b/src/devices/machine/nscsi_hle.cpp
+@@ -127,6 +127,9 @@ void nscsi_full_device::step(bool timeout)
+ 			for(m_scsi_initiator_id = 0; m_scsi_initiator_id != 16 && (m_scsi_initiator_id == m_scsi_id || (data & (1 << m_scsi_initiator_id))); m_scsi_initiator_id++) {};
+ 			if(m_scsi_initiator_id == 16)
+ 				m_scsi_initiator_id = -1;
++			// new nexus: an IDENTIFY from a previous selection must not leak into
++			// this one (a selection without IDENTIFY falls back to the CDB/default LUN)
++			m_scsi_identify = 0;
+ 			m_scsi_state = TARGET_SELECT_WAIT_BUS_SETTLE;
+ 			m_scsi_timer->adjust(scsi_bus_settle_delay(), true);
+ 		}
