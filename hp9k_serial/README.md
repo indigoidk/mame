@@ -24,7 +24,7 @@ audit incl. NEGATIVE findings (refuted candidates): **`ACCURACY_REVIEW.md`**. Ev
 | 98550/catseye: correct per-plane interrupt aggregation | `hp98550.cpp`, `catseye.cpp` | `hp98550-catseye-irq` |
 | hp9k3xx: bus-error read-flag cleanup (dead arg) | `hp9k_3xx.cpp` | `f5fccee` (hygiene) |
 | mb87030: drop redundant double scsi_disconnect | `mb87030.cpp` | `e89a2ac` (hygiene) |
-| hp9k3xx: on-board 98620 DMA added to the 330 + 332 (built-in @ 0x500000) | `hp9k_3xx.cpp` | `411d28f` (patch 0015) |
+| hp9k3xx: on-board 98620 DMA added to the 330 + 332 (built-in @ 0x500000) | `hp9k_3xx.cpp` | `hp9k330-332-onboard-dma` (0015) |
 
 hp300 fire rig (retires the campaign's L4/L12/L17 blockers): use `hp9k_patched_0288.exe` + the serial
 console, NOT `mame.exe` + the HIL keyboard — see **`HP300_FIRE_RECIPE.md`** + `hp300_fire.py`. The "L4

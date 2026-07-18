@@ -41,5 +41,5 @@ candidates): [`../ACCURACY_REVIEW.md`](../ACCURACY_REVIEW.md).
 Each fix maps 1:1 to a former per-fix PR branch (now flattened): 0001 `hp9k-nscsi-identify`, 0002
 `hp9k-mb87030-selection`, 0003+0004 `hp98644-dio-irq`, 0005 `m68k-address-error-vector`, 0006
 `hp98644-dio-wiredor`, 0007 `hp9k3xx-reset-irq6`, 0010+0013 (+0004) `hp98644-register-truing`, 0011
-`hp98620-dma-reset`, 0012 `hp98550-catseye-irq`. 0008/0009 were hygiene commits on `hp9k-serial-harness`.
+`hp98620-dma-reset`, 0012 `hp98550-catseye-irq`, 0014 `wd2010-multisector`, 0015 `hp9k330-332-onboard-dma`. 0008/0009 were hygiene commits on `hp9k-serial-harness`.
 The panel verdict table (unanimous) and refuted candidates are in `../ACCURACY_REVIEW.md`.
