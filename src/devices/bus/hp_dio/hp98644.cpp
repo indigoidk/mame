@@ -46,9 +46,6 @@ private:
 	bool     m_installed_io;
 	uint8_t  m_control;
 
-	bool     m_loopback;
-	uint8_t  m_data;
-
 	// The UART interrupt was never routed to the DIO bus, so an interrupt-driven guest (e.g. OpenBSD
 	// 2.2 'dca') could not drive TX/RX past the first byte. Wire the INS8250 int -> board IC_IE gate
 	// -> the DIP-selected DIO IRQ, mirroring hp98265a.
@@ -101,8 +98,6 @@ dio16_98644_device::dio16_98644_device(const machine_config &mconfig, device_typ
 	m_switches{*this, "switches"},
 	m_installed_io{false},
 	m_control{0},
-	m_loopback{false},
-	m_data{0},
 	m_irq_state{false}
 {
 }
@@ -186,8 +181,6 @@ void dio16_98644_device::device_start()
 {
 	save_item(NAME(m_installed_io));
 	save_item(NAME(m_control));
-	save_item(NAME(m_loopback));
-	save_item(NAME(m_data));
 	save_item(NAME(m_irq_state));
 	m_installed_io = false;
 }
@@ -210,9 +203,7 @@ void dio16_98644_device::device_reset()
 				write16sm_delegate(*this, FUNC(dio16_98644_device::io_w)));
 		m_installed_io = true;
 	}
-	m_data = 0;
 	m_control = 0;
-	m_loopback = false;
 	m_irq_state = false;
 	update_irq(false);   // deassert all DIO IRQ lines on card reset (was left asserted across reset)
 }
@@ -251,11 +242,13 @@ uint16_t dio16_98644_device::io_r(offs_t offset)
 
 	switch(offset) {
 	case 0: /* ID */
-		ret = 0x02;
+		// Primary ID 2 (bits 4:0); secondary ID in bits 6:5.  The native 98644A reports secondary
+		// ID 2 => 0x42; "98626 emulation" mode reports secondary ID 0 => 0x02.  Bit 7 is Remote.
+		// Verified against the Series 300 boot ROM ID table (0x42="HP98644", 0x02="HP98626") and the
+		// HP 98644A reference manual; OpenBSD's dca accepts 0x02/0x42/0x82/0xC2 alike.
+		ret = (m_switches->read() & REG_SWITCHES_98626_EN) ? 0x02 : 0x42;
 		if (m_switches->read() & REG_SWITCHES_REMOTE)
 			ret |= 0x80;
-		if (m_switches->read() & REG_SWITCHES_98626_EN)
-			ret |= 0x40;
 		break;
 
 	case 1:
@@ -280,23 +273,11 @@ uint16_t dio16_98644_device::io_r(offs_t offset)
 		break;
 	}
 
-
-	if (m_loopback && offset == 8) {
-		ret = m_data;
-	}
 	return ret;
 }
 
 void dio16_98644_device::io_w(offs_t offset, uint16_t data)
 {
-	if (offset == 0x0c)
-		m_loopback = (data & 0x10) ? true : false;
-
-	if (m_loopback && offset == 8) {
-		m_data = data;
-		return;
-	}
-
 	switch(offset) {
 	case 0:
 		m_uart->reset();
