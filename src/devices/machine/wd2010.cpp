@@ -17,7 +17,6 @@ Implements WD2010 / WD1010 controller basics for a single hard disk.
 
 UNIMPLEMENTED FEATURES :
         - more than 1 drive (untested)
-    - multi sector transfers (M = 1)
         - seek and index timers / ID not found.
         - implied seeks / implied writes / retries
         - edge or level triggered seek complete (SC)
@@ -935,10 +934,16 @@ void wd2010_device::complete_immediate(uint8_t status)
 		m_out_bdrq_cb(0);
 	}
 
+	// MULTIPLE SECTOR TRANSFER (M = 1): after each sector, decrement the Sector Count register and
+	// auto-increment the Sector Number register, repeating until the count reaches 0 (a loaded count
+	// of 0 means 256).  The first sector was already transferred by the read/write handler, so testing
+	// the post-decrement value against 0 gives exactly N transfers for a loaded count of N.  (Was
+	// "> 1", which stopped one sector early and left the count at 1 -- the HP 9133 low-level format
+	// and verify then failed; mamedev/mame #14104.)
 	uint8_t cmd = m_task_file[TASK_FILE_COMMAND] & 0xf4;
-	if ((cmd == 0x24) || (cmd == 0x34))
+	if ((cmd == 0x24) || (cmd == 0x34))     // READ (0x20) / WRITE (0x30) SECTOR with M = 1 (0x04)
 	{
-		if (--m_task_file[TASK_FILE_SECTOR_COUNT] > 1)
+		if (--m_task_file[TASK_FILE_SECTOR_COUNT] != 0)
 		{
 			m_task_file[TASK_FILE_SECTOR_NUMBER]++;
 			m_next_sector_timer->adjust(attotime::from_usec(100));
