@@ -38,6 +38,11 @@ candidates are in the audit).
 **Also** — `wd2010`: an M=1 multi-sector transfer fix (off-by-one) resolves the HP 9133 low-level format
 hang on the HP 9000/200 (`hp9816a`) — [#14104](https://github.com/mamedev/mame/issues/14104).
 
+**Also** — `hp9k3xx`: the on-board **98620 DMA controller** was missing from the 9000/330 and 9000/332
+(both SPUs carry it built-in at `0x500000`). Adding it lets the boot ROM detect the DMA (`DMA-C0`) and the
+330 boot **HP BASIC 5.1**, and restores the internal-HP-IB DMA path. (Patch 0015, from the onboard-I/O
+survey; the 310/320 are unchanged — an optional add-in card there, not built in.)
+
 ---
 
 # MAME
