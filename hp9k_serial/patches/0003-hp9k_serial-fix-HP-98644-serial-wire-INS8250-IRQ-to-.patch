@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Thu, 16 Jul 2026 19:37:11 -0500
-Subject: [PATCH 03/13] hp9k_serial: fix HP 98644 serial (wire INS8250 IRQ to
+Subject: [PATCH 03/14] hp9k_serial: fix HP 98644 serial (wire INS8250 IRQ to
  DIO bus) + serial harness
 
 The HP98644A async serial card (sl2 on hp9k360) never routed the INS8250

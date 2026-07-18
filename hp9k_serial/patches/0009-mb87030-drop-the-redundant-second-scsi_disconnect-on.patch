@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Sat, 18 Jul 2026 12:18:06 -0500
-Subject: [PATCH 09/13] mb87030: drop the redundant second scsi_disconnect on
+Subject: [PATCH 09/14] mb87030: drop the redundant second scsi_disconnect on
  bus-free
 
 When the initiator is connected and the bus goes fully free, the

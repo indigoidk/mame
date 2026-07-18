@@ -1,15 +1,20 @@
 # HP 9000/300 MAME emulation-layer fixes — patch series
 
-13 device/CPU **accuracy fixes** for the HP 9000/300 (`hp9k3xx`), discovered and resolved in the
-2026-07-18 emulation-layer audit and adversarially verified with the Codex 5.6-SOL (xtra-high) + Fable
-review panel. Full audit incl. **negative findings** (refuted candidates): [`../ACCURACY_REVIEW.md`](../ACCURACY_REVIEW.md).
+**14** device/CPU **accuracy fixes** for MAME's HP 9000 emulation — 13 for the HP 9000/300 (`hp9k3xx`),
+plus a WD2010 multi-sector fix that resolves the HP 9133 disk low-level format on the HP 9000/200
+(`hp9816a`) — discovered and resolved in the 2026-07 emulation-layer audit and adversarially verified with
+the Codex 5.6-SOL (xtra-high) + Fable review panel. Full audit incl. **negative findings** (refuted
+candidates): [`../ACCURACY_REVIEW.md`](../ACCURACY_REVIEW.md).
 
-- **Flattened branch:** `hp9k-emulation-fixes` — the same 13 commits, linear, src-only, off `master`.
+- **Flattened branch:** `hp9k-emulation-fixes` — the same 14 commits, linear, src-only, rebased on current
+  upstream `master`. Individual upstream-PR branches also exist (e.g. `wd2010-multisector` for 0014).
 - **Apply the series:** `git am 00*.patch` onto a clean `master` checkout. They are an *ordered series*
   (several touch a common file — e.g. four cumulative `hp98644.cpp` changes — so apply in number order,
   not individually).
-- Every fix is compiled into `hp9k_patched_0288.exe` and regression-verified (OpenBSD 2.2 boots over the
-  serial console; the Remote-DIP kernel console + raw-disk reads verified).
+- Fixes 0001–0013 are compiled into `hp9k_patched_0288.exe` and regression-verified (OpenBSD 2.2 boots
+  over the serial console; HP-UX 9.10 boots past the SCSI disk probe — reproducing & fixing #15076).
+  Fix 0014 (wd2010) is a verified one-line correction for a different subtarget (`hp9816a`);
+  runtime-verifiable once the `hp9816a` romset is present.
 
 ## All fixes discovered & resolved
 
@@ -28,6 +33,7 @@ review panel. Full audit incl. **negative findings** (refuted candidates): [`../
 | 0011 | 98620 DMA reset | `device_reset` left the DMA channels armed and a DIO IRQ possibly asserted | disarm both channels, clear IRQ/enable, restore IRQ level 3 + byte size, `update_irq()` (address/TC preserved per the 98620C spec) | `hp98620.cpp` |
 | 0012 | 98550/catseye per-plane IRQ | `catseye::update_int()` called the devcb with a single arg (offset 0, plane# as data) → every plane collapsed onto `m_ints` bit 0; deasserts left a stuck interrupt | pass `(plane, state)`; OR the shifted bit in `int_w`; re-evaluate on `m_intreg`/reset | `hp98550.cpp`, `catseye.cpp` |
 | 0013 | 98644 modem DIP | the "Modem line enable" DIP (SW3) was read nowhere | off ⇒ strap CTS/DSR/RI/CD asserted on the board; on ⇒ follow the RS-232 peer (per 98644A ref manual p.3-3 / Fig 12-1) | `hp98644.cpp` |
+| 0014 | wd2010 M=1 multisector (**#14104**) | the WD2010 multi-sector loop terminator tested the post-decrement sector count against 1, not 0 → transferred N−1 sectors and left the count at 1; the HP 9133 low-level format/verify never completed on `hp9816a` | test the post-decrement count against 0 → exactly N sectors (0 ⇒ 256 via the u8 wrap); single-sector (M=0) unchanged | `wd2010.cpp` |
 
 ## Provenance
 

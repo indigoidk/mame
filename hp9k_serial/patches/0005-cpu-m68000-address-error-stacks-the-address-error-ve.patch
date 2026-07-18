@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Fri, 17 Jul 2026 06:45:16 -0500
-Subject: [PATCH 05/13] cpu/m68000: address error stacks the address-error
+Subject: [PATCH 05/14] cpu/m68000: address error stacks the address-error
  vector (3), not bus-error (2)
 
 m68ki_exception_address_error() initializes the exception as EXCEPTION_ADDRESS_ERROR and jumps to
@@ -19,10 +19,10 @@ Claude-Session: https://claude.ai/code/session_015NLjugzo1VuKK1UeMfKFQa
  1 file changed, 7 insertions(+), 4 deletions(-)
 
 diff --git a/src/devices/cpu/m68000/m68kcpu.h b/src/devices/cpu/m68000/m68kcpu.h
-index 33f2916112b..965331597f0 100644
+index 91315b7ffa2..a55c973e3d3 100644
 --- a/src/devices/cpu/m68000/m68kcpu.h
 +++ b/src/devices/cpu/m68000/m68kcpu.h
-@@ -1644,6 +1644,9 @@ inline void m68ki_exception_address_error()
+@@ -1674,6 +1674,9 @@ inline void m68ki_exception_address_error()
  
  	m_run_mode = RUN_MODE_BERR_AERR_RESET_WSF;
  
@@ -32,7 +32,7 @@ index 33f2916112b..965331597f0 100644
  	if (CPU_TYPE_IS_000())
  	{
  		/* Note: This is implemented for 68000 only! */
-@@ -1652,20 +1655,20 @@ inline void m68ki_exception_address_error()
+@@ -1682,20 +1685,20 @@ inline void m68ki_exception_address_error()
  	else if (CPU_TYPE_IS_010())
  	{
  		/* only the 68010 throws this unique type-1000 frame */

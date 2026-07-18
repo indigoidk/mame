@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Thu, 9 Jul 2026 14:21:20 -0500
-Subject: [PATCH 01/13] nscsi: clear stored IDENTIFY at new selection (stale
+Subject: [PATCH 01/14] nscsi: clear stored IDENTIFY at new selection (stale
  LUN leaked across nexuses)
 
 nscsi_full_device latches the IDENTIFY message (m_scsi_identify) and clears it

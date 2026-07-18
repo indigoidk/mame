@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Sat, 18 Jul 2026 13:00:32 -0500
-Subject: [PATCH 12/13] hp98550/catseye: fix the per-plane interrupt
+Subject: [PATCH 12/14] hp98550/catseye: fix the per-plane interrupt
  aggregation
 
 catseye_device::update_int() invoked the devcb_write8 with a single

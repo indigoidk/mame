@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Sat, 18 Jul 2026 13:12:24 -0500
-Subject: [PATCH 13/13] hp98644: honor the "Modem line enable" DIP (SW3)
+Subject: [PATCH 13/14] hp98644: honor the "Modem line enable" DIP (SW3)
 
 The DIP was defined but read nowhere. Per the 98644A reference manual
 (98644-90002, switch 3 on p.3-3 and schematic Fig. 12-1): position 0

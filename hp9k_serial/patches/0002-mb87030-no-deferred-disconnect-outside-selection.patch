@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Thu, 9 Jul 2026 14:25:10 -0500
-Subject: [PATCH 02/13] mb87030: no deferred disconnect outside selection
+Subject: [PATCH 02/14] mb87030: no deferred disconnect outside selection
 
 Commit b50b19b459 ("mb87030: Fix some timings") replaced the immediate
 initiator bus-free disconnect check - which exempted the Selection states -

@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Sat, 18 Jul 2026 12:18:05 -0500
-Subject: [PATCH 08/13] hp9k3xx: correct the bus-error read/write flag
+Subject: [PATCH 08/14] hp9k3xx: correct the bus-error read/write flag
  (dead-arg cleanup)
 
 set_bus_error()'s middle argument is forwarded to

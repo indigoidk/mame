@@ -1,0 +1,56 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: indigoidk <indigoidk@users.noreply.github.com>
+Date: Sat, 18 Jul 2026 14:40:21 -0500
+Subject: [PATCH 14/14] wd2010: fix M=1 multi-sector transfers (off-by-one)
+
+The multi-sector (M=1) machinery was already present (per-sector
+m_next_sector_timer / next_sector re-arm from complete_immediate) but the
+loop terminator tested the post-decrement Sector Count register against 1
+instead of 0, so it transferred N-1 sectors and left the count at 1. The
+HP 9133 low-level format/verify issues multi-sector transfers and never
+completed -- the disk initialization appears to hang past the last
+cylinder. Test the post-decrement count against 0 -> exactly N sectors
+for a loaded count of N (0 -> 256 via the u8 wrap), matching the
+WD2010/WD1010 datasheet and wd1010.cpp. Single-sector (M=0) is unchanged
+(the block only runs for READ/WRITE SECTOR with the M flag set).
+
+Resolves the HP 9133 HP-IB disk init failure on hp9816a
+(mamedev/mame #14104). Diagnosis credit: climatex on the issue thread.
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01LK3cToPNL8r9RQCFCS3uUB
+---
+ src/devices/machine/wd2010.cpp | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
+diff --git a/src/devices/machine/wd2010.cpp b/src/devices/machine/wd2010.cpp
+index 642ef2aeecc..382292eb6c4 100644
+--- a/src/devices/machine/wd2010.cpp
++++ b/src/devices/machine/wd2010.cpp
+@@ -17,7 +17,6 @@ Implements WD2010 / WD1010 controller basics for a single hard disk.
+ 
+ UNIMPLEMENTED FEATURES :
+         - more than 1 drive (untested)
+-    - multi sector transfers (M = 1)
+         - seek and index timers / ID not found.
+         - implied seeks / implied writes / retries
+         - edge or level triggered seek complete (SC)
+@@ -935,10 +934,16 @@ void wd2010_device::complete_immediate(uint8_t status)
+ 		m_out_bdrq_cb(0);
+ 	}
+ 
++	// MULTIPLE SECTOR TRANSFER (M = 1): after each sector, decrement the Sector Count register and
++	// auto-increment the Sector Number register, repeating until the count reaches 0 (a loaded count
++	// of 0 means 256).  The first sector was already transferred by the read/write handler, so testing
++	// the post-decrement value against 0 gives exactly N transfers for a loaded count of N.  (Was
++	// "> 1", which stopped one sector early and left the count at 1 -- the HP 9133 low-level format
++	// and verify then failed; mamedev/mame #14104.)
+ 	uint8_t cmd = m_task_file[TASK_FILE_COMMAND] & 0xf4;
+-	if ((cmd == 0x24) || (cmd == 0x34))
++	if ((cmd == 0x24) || (cmd == 0x34))     // READ (0x20) / WRITE (0x30) SECTOR with M = 1 (0x04)
+ 	{
+-		if (--m_task_file[TASK_FILE_SECTOR_COUNT] > 1)
++		if (--m_task_file[TASK_FILE_SECTOR_COUNT] != 0)
+ 		{
+ 			m_task_file[TASK_FILE_SECTOR_NUMBER]++;
+ 			m_next_sector_timer->adjust(attotime::from_usec(100));

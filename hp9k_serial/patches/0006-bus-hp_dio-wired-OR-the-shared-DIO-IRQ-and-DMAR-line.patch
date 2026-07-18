@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Fri, 17 Jul 2026 14:19:08 -0500
-Subject: [PATCH 06/13] bus/hp_dio: wired-OR the shared DIO IRQ and DMAR lines
+Subject: [PATCH 06/14] bus/hp_dio: wired-OR the shared DIO IRQ and DMAR lines
 
 set_irq() drove the CPU interrupt callback with the raising/lowering card's
 raw state instead of the OR of all cards on that level, so on a shared level

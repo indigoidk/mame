@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Sat, 18 Jul 2026 13:00:31 -0500
-Subject: [PATCH 11/13] hp98620: disarm the DMA channels and drop the IRQ on
+Subject: [PATCH 11/14] hp98620: disarm the DMA channels and drop the IRQ on
  reset
 
 device_reset() only cleared two otherwise-unused members, leaving the

@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Sat, 18 Jul 2026 12:17:17 -0500
-Subject: [PATCH 07/13] hp9k3xx: wire the DIO32 CPU reset and merge the shared
+Subject: [PATCH 07/14] hp9k3xx: wire the DIO32 CPU reset and merge the shared
  IRQ6 line
 
 Two independent HP 9000/300 accuracy fixes in the machine driver:

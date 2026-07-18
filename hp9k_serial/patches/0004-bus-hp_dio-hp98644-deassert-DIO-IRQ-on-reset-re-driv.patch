@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Fri, 17 Jul 2026 06:45:16 -0500
-Subject: [PATCH 04/13] =?UTF-8?q?bus/hp=5Fdio:=20hp98644=20=E2=80=94=20dea?=
+Subject: [PATCH 04/14] =?UTF-8?q?bus/hp=5Fdio:=20hp98644=20=E2=80=94=20dea?=
  =?UTF-8?q?ssert=20DIO=20IRQ=20on=20reset=20+=20re-drive=20it=20after=20sa?=
  =?UTF-8?q?vestate?=
 MIME-Version: 1.0

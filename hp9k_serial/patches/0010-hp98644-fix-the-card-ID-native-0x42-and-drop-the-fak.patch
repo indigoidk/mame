@@ -1,7 +1,7 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: indigoidk <indigoidk@users.noreply.github.com>
 Date: Sat, 18 Jul 2026 12:35:54 -0500
-Subject: [PATCH 10/13] hp98644: fix the card ID (native 0x42) and drop the
+Subject: [PATCH 10/14] hp98644: fix the card ID (native 0x42) and drop the
  fake loopback shadow
 
 Two HP 98644A register-accuracy fixes:
