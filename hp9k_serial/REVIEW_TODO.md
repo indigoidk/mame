@@ -13,11 +13,13 @@ Full write-up: `ACCURACY_REVIEW.md`. Fixes on `hp9k-serial-harness`, rebuilt + r
       ARCH item below is **REFUTED as a live defect** (dead on every hp9k3xx CPU: 010+ frames source R/W
       from the CPU temps, re-snapshotted at BUSERROR service; only fault_addr survives). Cleaned up anyway.
 - [x] **mb87030 redundant double scsi_disconnect** (`e89a2ac`) — benign, added a `return`.
-- **CONFIRMED by the panel, HELD for the user's go:** 98644 ID polarity is INVERTED (native = **0x42**,
-      not 0x02 — Fable dumped the Rev C boot ROM ID table: `42`="HP98644", `02`="HP98626"; dca accepts both
-      so the serial console is unaffected); 98644 loopback shadow (delete, use ins8250 LOOP, regression-test
-      the boot self-test); 98620 reset incomplete (clear control/ARM/INT + level 3, PRESERVE address/TC);
-      98550 per-plane IRQ stomp (root is `catseye.cpp` single-arg devcb — fix touches catseye.cpp + hp98550.cpp).
+- [x] **98644 register truing: ID native 0x42 + loopback shadow removed** (`c9fbd41`; stacked PR branch
+      `hp98644-register-truing` off `hp98644-dio-irq`; rebuilt, both getty(0x42) + kernel-console(0xC2)
+      regressions PASS). ID was INVERTED (Fable dumped the Rev C boot ROM ID table: `42`=HP98644, `02`=HP98626;
+      dca accepts 0x02/0x42/0x82/0xC2 so both consoles are unaffected). Shadow removed → ins8250 native LOOP.
+- **Still HELD for the user's go (lower priority):** 98620 reset incomplete (clear control/ARM/INT + level 3,
+      PRESERVE address/TC); 98550 per-plane IRQ stomp (root is `catseye.cpp` single-arg devcb — fix touches
+      catseye.cpp + hp98550.cpp); 98644 modem-EN DIP ignored.
 - **Campaign L4 reconciled:** the raw-disk "panic" was the UNPATCHED mame.exe; patched binary + serial
       console = 0 panics (`panic_hunt.py`). Rig fix: `hp300_fire.py` + `HP300_FIRE_RECIPE.md`.
 

@@ -18,6 +18,7 @@ Fable dumping the Rev C boot ROM ID table locally to settle the 98644 ID questio
 | `3b139e5` | **B1** merge PTM+DIO IRQ6 via `INPUT_MERGER_ANY_HIGH`; **B2** wire DIO32 CPU reset | `hp9k_3xx.cpp` | built + regression PASS; **PR branch `hp9k3xx-reset-irq6` (off master), cherry-pick `ee31ff9`** |
 | `f5fccee` | **C1** correct/clarify the bus-error read flag (dead-arg cleanup) | `hp9k_3xx.cpp` | built; no behavioral change |
 | `e89a2ac` | **B7** drop the redundant second `scsi_disconnect` on bus-free | `mb87030.cpp` | built + regression PASS |
+| `c9fbd41` | **C3** 98644 ID → native 0x42 (was 0x02); **B4** remove the fake loopback shadow | `hp98644.cpp` | built + regression PASS (getty @0x42, kernel console @0xC2); **stacked PR branch `hp98644-register-truing`** off `hp98644-dio-irq` |
 
 Binary: rebuilt `hp9k_patched_0288.exe` (old → `.bak-preResetIrq6`). **Regression PASS**
 (`regress_dio_wiredor.py`): hp9k360/OpenBSD 2.2 boots to a serial login — which *requires* the 250 kHz
@@ -61,8 +62,8 @@ Rig fix (retires L4/L12/L17): `hp300_fire.py` (generalized serial fire runner) +
   synchronous). Idempotent (`m_ints = INTS_DISCONNECTED`), so benign — added a `return`. *(My finding;
   not in the panel brief.)*
 
-### Confirmed, NOT yet applied — **held for your go** (C3/B4 were gated; B3/B5 are lower priority)
-- **C3 — 98644 ID register polarity is INVERTED (`hp98644.cpp` io_r case 0).** Native 98644A = **0x42**,
+### Confirmed — C3 + B4 now FIXED (`c9fbd41`, stacked PR branch `hp98644-register-truing`); B3/B5/B6 held
+- **C3 [FIXED `c9fbd41`] — 98644 ID register polarity was INVERTED (`hp98644.cpp` io_r case 0).** Native 98644A = **0x42**,
   98626-emulation = 0x02; current code returns 0x02 base and *sets* 0x40 for 98626-emulation — backwards
   — and the DIP defaults to the emulation value. **Definitive evidence:** Fable dumped the Rev C boot ROM
   ID table from `roms\hp9k360.zip`: `02`="HP98626 (RS-232)", `42`="HP98644 (RS-232)"; Codex cites the HP
@@ -70,7 +71,7 @@ Rig fix (retires L4/L12/L17): `hp300_fire.py` (generalized serial fire runner) +
   **Safe to change:** OpenBSD `dca` accepts 0x02/0x42/0x82/0xC2 identically, so the serial console keeps
   working; the guest-visible effect today is *misidentification* (boot ROM prints "HP98626"). **Fix:**
   `ret = 0x42; if (REMOTE) ret |= 0x80; if (98626_EN) ret &= ~0x40;` *(Codex + Fable CONFIRM.)*
-- **B4 — 98644 fake board loopback shadow.** The board's `m_loopback`/`m_data` intercept THR/RBR when
+- **B4 [FIXED `c9fbd41`] — 98644 fake board loopback shadow.** The board's `m_loopback`/`m_data` intercept THR/RBR when
   MCR LOOP is set, bypassing the INS8250's native LOOP (no LSR THRE/DR, no IIR, no baud delay, 1 byte).
   Real card has no such register (BSD `dcareg.h`). **Fix:** delete the shadow, rely on `ins8250.cpp`
   native LOOP — **regression-test the boot-ROM serial self-test** (the shadow was in Sven's original
@@ -144,8 +145,8 @@ These are recorded so they are not re-investigated. **The panel agreed with each
 | B1 IRQ6 merger | CONFIRM | CONFIRM | CONFIRM | **fixed** `3b139e5` |
 | B2 DIO32 reset | CONFIRM | CONFIRM | CONFIRM | **fixed** `3b139e5` (+ follow-up PR for per-card `reset_in`) |
 | C1 bus-error rw | REFUTE (dead) | REFUTE (dead) | REFUTE | **cleaned up** `f5fccee` |
-| C3 98644 ID polarity | CONFIRM (0x42) | CONFIRM (0x42, ROM-table) | was wrong → CONFIRM | **held for go** |
-| B4 98644 loopback | CONFIRM | CONFIRM | CONFIRM | **held for go** |
+| C3 98644 ID polarity | CONFIRM (0x42) | CONFIRM (0x42, ROM-table) | was wrong → CONFIRM | **fixed** `c9fbd41` |
+| B4 98644 loopback | CONFIRM | CONFIRM | CONFIRM | **fixed** `c9fbd41` |
 | B3 98620 reset | CONFIRM | CONFIRM | CONFIRM | held (lower prio) |
 | B5 98550 IRQ (catseye) | CONFIRM (catseye) | CONFIRM (catseye) | CONFIRM (deeper) | held (lower prio) |
 | B7 mb87030 dbl-disconnect | — | — | benign redundancy | **cleaned up** `e89a2ac` |
