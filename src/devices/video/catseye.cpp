@@ -151,11 +151,12 @@ void catseye_device::device_reset()
 void catseye_device::update_int()
 {
 	LOG("%s: pending %d, enabled %d\n", __func__, m_wm_int_pending, m_wm_int_enable);
-	if ((m_wm_int_enable && m_wm_int_pending ) ||
-		(m_vblank_int_enable && m_vblank_int_pending))
-		m_int_write_func(m_plane);
-	else
-		m_int_write_func(0);
+	bool const state = (m_wm_int_enable && m_wm_int_pending) ||
+		(m_vblank_int_enable && m_vblank_int_pending);
+	// Pass the plane as the write offset and the level as the data so the consumer can keep a correct
+	// per-plane interrupt bitmap.  (The single-argument form supplied offset 0 with the plane number
+	// as data, collapsing every plane onto bit 0 and leaving deassertions stuck.)
+	m_int_write_func(m_plane, state ? 1 : 0);
 }
 
 TIMER_CALLBACK_MEMBER(catseye_device::blink_callback)

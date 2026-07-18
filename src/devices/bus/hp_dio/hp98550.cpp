@@ -164,6 +164,7 @@ void dio32_98550_device::device_reset()
 {
 	m_intreg = 0;
 	m_ints = 0;
+	update_int();   // deassert any DIO IRQ this card was asserting
 }
 
 uint16_t dio32_98550_device::rom_r(offs_t offset, uint16_t mem_mask)
@@ -185,6 +186,7 @@ void dio32_98550_device::rom_w(offs_t offset, uint16_t data, uint16_t mem_mask)
 
 	case 1:
 		m_intreg = data;
+		update_int();   // the interrupt enable/level lives in m_intreg -> re-evaluate the line
 		break;
 
 	default:
@@ -236,7 +238,8 @@ void dio32_98550_device::int_w(offs_t offset, uint8_t data)
 {
 	LOG("%s: plane%d = %s\n", __func__, offset, data ? "assert" : "deassert");
 	m_ints &= ~(1 << offset);
-	m_ints |= data;
+	if (data)
+		m_ints |= (1 << offset);
 	update_int();
 }
 
