@@ -318,6 +318,9 @@ void mb87030_device::step(bool timeout)
 		LOG("SCSI disconnect\n");
 		scsi_disconnect();
 		scsi_set_ctrl(0, S_ALL);
+		// scsi_disconnect() already moved the SPC to Idle; return so the switch below does not
+		// re-enter the State::Idle bus-free path and issue a second, redundant scsi_disconnect().
+		return;
 	}
 
 	switch (m_state) {
