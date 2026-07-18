@@ -198,6 +198,24 @@ void dio16_98620_device::device_reset()
 	}
 	m_control = 0;
 	m_irq_state = false;
+
+	// A hardware reset disarms both DMA channels and clears their control/interrupt state (power-up
+	// control = interrupts disabled, byte mode, priority 0, IRQ level 3); the address and
+	// transfer-count registers are preserved (HP 98620C spec).
+	for (auto &r : m_regs) {
+		r.control = 0;
+		r.armed = false;
+		r.irq = false;
+		r.ie = false;
+		r.irq_level = 3;
+		r.tsz = 1;
+		r.subcount = 0;
+		r.dma_out = false;
+		r.dma_pri = false;
+		r.lword = false;
+		r.word = false;
+	}
+	update_irq();   // withdraw any DIO IRQ this card was still asserting
 }
 
 uint16_t dio16_98620_device::dma_r(offs_t offset)
@@ -387,13 +405,17 @@ void dio16_98620_device::dma_w(offs_t offset, uint16_t data)
 		break;
 
 	case REG_GENERAL_CONTROL:
+		// A channel reset clears ARM and the interrupt (status -> 0), preserving address/count.
 		if (data & REG_GENERAL_CONTROL_RESET0) {
-			m_regs[0].armed = 0;
+			m_regs[0].armed = false;
+			m_regs[0].irq = false;
 		}
 
 		if (data & REG_GENERAL_CONTROL_RESET1) {
-			m_regs[1].armed = 0;
+			m_regs[1].armed = false;
+			m_regs[1].irq = false;
 		}
+		update_irq();
 		break;
 
 	case REG0_1TQ4_CONTROL:
