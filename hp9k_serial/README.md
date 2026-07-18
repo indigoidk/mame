@@ -4,6 +4,32 @@ Branch: `hp9k-serial-harness` (off `hp9k-mb87030-selection`). Goal: raise MAME-H
 natkeyboard (~10 cps) + PNG-snapshot ceiling to clean bidirectional serial text I/O plus cycle-accurate
 m68k register capture at faults, bringing hp300 to parity with the pmax/arc/amiga fire rigs.
 
+## Emulation-layer accuracy fixes (shipped)
+
+Alongside the harness, this workstream produced a set of **MAME device/CPU accuracy fixes** for the HP
+9000/300, each found and adversarially verified with the Codex 5.6-SOL (xtra-high) + Fable panel. Full
+audit incl. NEGATIVE findings (refuted candidates): **`ACCURACY_REVIEW.md`**. Every fix is committed on
+`hp9k-serial-harness`; clean upstream-PR branches off `master` are noted.
+
+| Fix | Files | PR branch / commit |
+|-----|-------|--------------------|
+| SCSI: nscsi clears a stale IDENTIFY at a new selection (0001) | `nscsi_hle.cpp` | `hp9k-nscsi-identify` |
+| SCSI: mb87030 restores the prompt bus-free disconnect (0002) | `mb87030.cpp` | `hp9k-mb87030-selection` |
+| 98644 UART interrupt wired to the DIO bus (+ reset/savestate) | `hp98644.cpp` | `hp98644-dio-irq` |
+| DIO shared IRQ/DMAR made a true wired-OR (index-as-mask bug) | `hp_dio.{cpp,h}` | `hp98644-dio-wiredor` |
+| m68k address error stacks vector 3 (0x0C), not bus error (0x08) | `m68kcpu.h` | `m68k-address-error-vector` |
+| hp9k3xx: PTM+DIO IRQ6 merged; DIO32 CPU reset wired | `hp9k_3xx.cpp` | `hp9k3xx-reset-irq6` |
+| 98644 register truing: ID native 0x42; loopback shadow removed; modem-line DIP | `hp98644.cpp` | `hp98644-register-truing` (stacked on `hp98644-dio-irq`) |
+| 98620 DMA: disarm channels + drop IRQ on reset | `hp98620.cpp` | `hp98620-dma-reset` |
+| 98550/catseye: correct per-plane interrupt aggregation | `hp98550.cpp`, `catseye.cpp` | `hp98550-catseye-irq` |
+| hp9k3xx: bus-error read-flag cleanup (dead arg) | `hp9k_3xx.cpp` | `f5fccee` (hygiene) |
+| mb87030: drop redundant double scsi_disconnect | `mb87030.cpp` | `e89a2ac` (hygiene) |
+
+hp300 fire rig (retires the campaign's L4/L12/L17 blockers): use `hp9k_patched_0288.exe` + the serial
+console, NOT `mame.exe` + the HIL keyboard — see **`HP300_FIRE_RECIPE.md`** + `hp300_fire.py`. The "L4
+raw-disk panics the kernel" was an artifact of the unpatched `mame.exe`; on the patched binary raw-disk
+reads do not panic (`panic_hunt.py`).
+
 ## Status
 
 - [x] **Phase A — serial byte path: SOLVED.** `printf HPSERBYTES > /dev/tty0` now delivers all 10 bytes to
@@ -23,11 +49,12 @@ m68k register capture at faults, bringing hp300 to parity with the pmax/arc/amig
   `debugger_exception_hook` is FALSE — the MMU path DOES call it (`m68kcpu.cpp:957` → `m68kcpu.h:1164`). So
   the better capture is `-debugger gdbstub` + `monitor epset 2`/`epset 3` (image-independent, discriminates
   bus-error vs address-error), combined with a `bpset` on the handler to read the built stack frame — TODO.)
-- [x] **#3 (raw-disk panic): reproduced + characterized.** `phase4_panic.py` attaches a blank unlabeled
-  `rsd1` and reads `/dev/rsd1c`, capturing a kernel null-deref (`A5=0`, SR supervisor) at `FAULT_PC=0x10C26`
-  = **`_db_lookup`** (via `phase4_symbol.py`/`nm /bsd`): reading the label-less raw disk drops into DDB and
-  DDB's symbol lookup null-derefs (null in-kernel symtab). Workaround: pre-write a disklabel on the 2nd
-  disk, or use the cd9660 ISO channel.
+- [x] **#3 (raw-disk panic): RE-CHARACTERIZED as non-reproducible on a correct rig.** On the SCSI-patched
+  binary + serial console, `panic_hunt.py` runs the full raw-disk battery with **zero** kernel panics
+  (`rsd1c` → default-label synthesis + a clean read; others → "Device not configured"). The earlier
+  `FAULT_PC=0x10C26=_db_lookup` capture was a **ddb secondary** null-deref (ddb's own symbol lookup on a
+  null in-kernel symtab), not a raw-disk origin. The campaign's "L4 raw-disk panics the kernel" was the
+  UNPATCHED `mame.exe`, not a MAME defect. See `ACCURACY_REVIEW.md` §5 + `HP300_FIRE_RECIPE.md`.
 - [x] **#5 (DDBSER kernel): SUPERSEDED** — `-debugger gdbstub` gives m68k crash register capture with no
   guest kernel rebuild; the DDBSER port is only needed for in-guest ddb state gdb/MAME can't provide.
 
