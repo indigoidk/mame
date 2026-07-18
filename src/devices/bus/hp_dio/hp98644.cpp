@@ -53,6 +53,14 @@ private:
 	int      get_int_level();
 	void     update_irq(bool state);
 	bool     m_irq_state;
+
+	// "Modem line enable" DIP (SW3): when clear, the 98644A straps CTS/DSR/RI/CD low (asserted)
+	// regardless of the connector; when set they follow the RS-232 peer (HP 98644A ref manual 3/11).
+	bool     modem_enabled();
+	void     modem_dcd_w(int state);
+	void     modem_dsr_w(int state);
+	void     modem_cts_w(int state);
+	void     modem_ri_w(int state);
 };
 
 //-------------------------------------------------
@@ -72,10 +80,11 @@ void dio16_98644_device::device_add_mconfig(machine_config &config)
 
 	rs232_port_device &rs232(RS232_PORT(config, RS232_TAG, default_rs232_devices, nullptr));
 	rs232.rxd_handler().set(m_uart, FUNC(ins8250_uart_device::rx_w));
-	rs232.dcd_handler().set(m_uart, FUNC(ins8250_uart_device::dcd_w));
-	rs232.dsr_handler().set(m_uart, FUNC(ins8250_uart_device::dsr_w));
-	rs232.ri_handler().set(m_uart, FUNC(ins8250_uart_device::ri_w));
-	rs232.cts_handler().set(m_uart, FUNC(ins8250_uart_device::cts_w));
+	// The four modem-status inputs pass through the "Modem line enable" DIP (see modem_*_w).
+	rs232.dcd_handler().set(DEVICE_SELF, FUNC(dio16_98644_device::modem_dcd_w));
+	rs232.dsr_handler().set(DEVICE_SELF, FUNC(dio16_98644_device::modem_dsr_w));
+	rs232.ri_handler().set(DEVICE_SELF, FUNC(dio16_98644_device::modem_ri_w));
+	rs232.cts_handler().set(DEVICE_SELF, FUNC(dio16_98644_device::modem_cts_w));
 }
 
 //**************************************************************************
@@ -228,6 +237,15 @@ void dio16_98644_device::update_irq(bool state)
 	irq5_out(state && level == 2);
 	irq6_out(state && level == 3);
 }
+
+// "Modem line enable" DIP off => the four modem-status inputs are strapped low (asserted) on the board
+// regardless of the connector; on => they follow the RS-232 peer.  0 = asserted at the INS8250 (its MSR
+// uses !dcd/!dsr/!cts/!ri).  DTR/RTS are not affected by this DIP.  (HP 98644A ref manual, sections 3 & 11.)
+bool dio16_98644_device::modem_enabled() { return (m_switches->read() & REG_SWITCHES_MODEM_EN) != 0; }
+void dio16_98644_device::modem_dcd_w(int state) { m_uart->dcd_w(modem_enabled() ? state : 0); }
+void dio16_98644_device::modem_dsr_w(int state) { m_uart->dsr_w(modem_enabled() ? state : 0); }
+void dio16_98644_device::modem_cts_w(int state) { m_uart->cts_w(modem_enabled() ? state : 0); }
+void dio16_98644_device::modem_ri_w(int state)  { m_uart->ri_w(modem_enabled()  ? state : 0); }
 
 void dio16_98644_device::irq_w(int state)
 {
