@@ -1,43 +1,39 @@
 # HP 9000 emulation — restoration & accuracy fixes (this fork)
 
-This is a fork of MAME with a focused effort to **restore Hewlett-Packard HP 9000/300 (`hp9k3xx`)
-emulation to a working state** and true up its device/CPU accuracy. Before this work every `hp9k3xx`
-model was flagged `MACHINE_NOT_WORKING` and could not boot a real operating system. With the fixes below
-the 9000/360 and 9000/370 boot **OpenBSD 2.2** and **HP-UX 9.10** to multiuser, and one of them resolves
-the open upstream report [mamedev/mame#15076](https://github.com/mamedev/mame/issues/15076) (hp9k370
-HP-UX SCSI panic — reproduced and fixed here).
+A fork of MAME that **restores Hewlett-Packard HP 9000/300 (`hp9k3xx`) emulation to a working state** and
+trues up its device/CPU accuracy. Previously every `hp9k3xx` model was `MACHINE_NOT_WORKING` and booted no
+real OS; with these fixes the 9000/360 and 9000/370 boot **OpenBSD 2.2** and **HP-UX 9.10** to multiuser,
+and one resolves upstream [#15076](https://github.com/mamedev/mame/issues/15076) (hp9k370 HP-UX SCSI panic
+— reproduced + fixed here). Full audit + `git am` patch series on branch **`hp9k-serial-harness`**
+(`hp9k_serial/ACCURACY_REVIEW.md`, `hp9k_serial/patches/`); linear on **`hp9k-emulation-fixes`**. All
+rebase cleanly onto current upstream. Two SCSI patches restore boot; the other eleven are accuracy fixes
+found in an **OpenBSD 2.2 audit** (multi-model review — Codex 5.6-SOL + Fable).
 
-Two SCSI patches restore booting; the remaining eleven are device/CPU **accuracy fixes** discovered and
-adversarially verified during an **OpenBSD 2.2 emulation audit** (multi-model review — Codex 5.6-SOL +
-Fable — cross-checked against HP hardware manuals and the NetBSD/OpenBSD hp300 drivers). The full audit,
-negative findings, and an applyable `git am` patch series are on the **`hp9k-serial-harness`** branch
-(`hp9k_serial/ACCURACY_REVIEW.md`, `hp9k_serial/patches/`); the same commits, linearized, are on
-**`hp9k-emulation-fixes`**. Every fix rebases cleanly onto current upstream `master`.
+**SCSI — restores boot**
 
-### Restoring boot — SCSI fixes
-| Fix | What was broken |
-|-----|-----------------|
-| **nscsi: clear stored IDENTIFY at new selection** | a stale LUN leaked across nexuses → the polled HP boot ROM saw the wrong LUN and the disk never enumerated |
-| **mb87030: no deferred disconnect outside selection** | the 0.285 `b50b19b459` state-blind 10 ms auto-disconnect timer broke the polled boot ROM → "System Search Mode" and the HP-UX `scsi_if_isr: Service Req'd and no owner` panic — **the fix for #15076** |
+| Fix | Was broken |
+|---|---|
+| `nscsi`: clear stale IDENTIFY at new selection | stale LUN leaked → disk never enumerated |
+| `mb87030`: prompt bus-free disconnect | 0.285 10 ms-timer regression → no boot / `scsi_if_isr` panic (**fixes #15076**) |
 
-### Accuracy fixes found in the OpenBSD 2.2 audit
-| Fix | What was wrong |
-|-----|-----------------|
-| **hp98644: wire the INS8250 IRQ to the DIO bus** | the serial UART interrupt was never routed → interrupt-driven `dca` stalled after 1–2 bytes |
-| **hp98644: deassert DIO IRQ on reset + re-drive after savestate** | the IRQ was left asserted across reset and not restored after a savestate |
-| **m68k: address error stacks vector 3, not bus error** | the 010/020/030/040 frame encoded offset 0x008 (bus error) instead of 0x00C (address error) |
-| **hp_dio: wired-OR the shared IRQ/DMAR lines** | an index-used-as-mask accessor masked real card bits; the CPU line followed the last writer |
-| **hp9k3xx: merge IRQ6 + wire the DIO32 CPU reset** | the PTM and DIO both drove IRQ6 directly (lost timer ticks); DIO-II cards never received a CPU `RESET` |
-| **hp9k3xx: correct the bus-error read/write flag** | inconsistent/dead R/W arguments (harmless on 010+, documented) |
-| **mb87030: drop the redundant second scsi_disconnect** | bus-free could call `scsi_disconnect()` twice in one step |
-| **hp98644: native card ID 0x42 + remove fake loopback** | the ID polarity was inverted (native should read 0x42, not 0x02) and a fake 1-byte loopback shadow bypassed the INS8250's real LOOP |
-| **hp98620: disarm DMA channels + drop IRQ on reset** | reset left the DMA channels armed and a DIO IRQ possibly asserted |
-| **hp98550 / catseye: fix per-plane interrupt aggregation** | a single-argument devcb collapsed every video plane onto one bit → a stuck interrupt |
-| **hp98644: honor the "Modem line enable" DIP** | the DIP was read nowhere (when off it must strap CTS/DSR/RI/CD asserted) |
+**Accuracy — found in the OpenBSD 2.2 audit**
 
-Each fix is built into a native hp9k binary and regression-verified (OpenBSD 2.2 boots to a serial login;
-HP-UX 9.10 boots past the SCSI disk probe into fsck). Multi-model review verdicts were unanimous; refuted
-candidates (negative findings) are recorded in the audit.
+| Fix | Was broken |
+|---|---|
+| `hp98644`: wire UART IRQ to the DIO bus | `dca` stalled after 1–2 bytes (IRQ unrouted) |
+| `hp98644`: deassert IRQ on reset + savestate | IRQ stuck across reset / restore |
+| `m68k`: address error stacks vector 3 | frame used bus-error offset 0x08, not 0x0C |
+| `hp_dio`: wired-OR the shared IRQ/DMAR | index-as-mask bug; last-writer-wins |
+| `hp9k3xx`: merge IRQ6 + wire DIO32 reset | PTM/DIO clashed on IRQ6; DIO-II never reset |
+| `hp9k3xx`: fix the bus-error R/W flag | dead / inconsistent arg (harmless on 010+) |
+| `mb87030`: drop double scsi_disconnect | disconnect issued twice per step |
+| `hp98644`: native ID 0x42 + drop fake loopback | ID polarity inverted; shadow bypassed 8250 LOOP |
+| `hp98620`: disarm DMA + drop IRQ on reset | reset left channels armed / IRQ asserted |
+| `hp98550`/`catseye`: per-plane interrupts | planes collapsed onto one bit → stuck IRQ |
+| `hp98644`: honor the Modem-enable DIP | DIP ignored (off must strap CTS/DSR/RI/CD) |
+
+Each is built into a native hp9k binary and regression-verified; review verdicts were unanimous (refuted
+candidates are in the audit).
 
 ---
 
