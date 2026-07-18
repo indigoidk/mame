@@ -65,6 +65,7 @@
 #include "cpu/m68000/m68030.h"
 #include "cpu/m68000/m68040.h"
 #include "machine/6840ptm.h"
+#include "machine/input_merger.h"
 #include "bus/hp_dio/hp_dio.h"
 
 #include "screen.h"
@@ -83,6 +84,7 @@ public:
 	hp9k3xx_state(const machine_config &mconfig, device_type type, const char *tag) :
 		driver_device(mconfig, type, tag),
 		m_maincpu(*this, MAINCPU_TAG),
+		m_irq6(*this, "irq6"),
 		m_diag_led(*this, "led_diag_%u", 0U)
 	{ }
 
@@ -102,6 +104,7 @@ protected:
 private:
 	void hp9k300(machine_config &config);
 	required_device<m68000_musashi_device> m_maincpu;
+	required_device<input_merger_device> m_irq6;
 
 	output_finder<8> m_diag_led;
 
@@ -132,7 +135,7 @@ private:
 	void dio_irq3_w(int state) { m_maincpu->set_input_line(M68K_IRQ_3, state); }
 	void dio_irq4_w(int state) { m_maincpu->set_input_line(M68K_IRQ_4, state); }
 	void dio_irq5_w(int state) { m_maincpu->set_input_line(M68K_IRQ_5, state); }
-	void dio_irq6_w(int state) { m_maincpu->set_input_line(M68K_IRQ_6, state); }
+	void dio_irq6_w(int state) { m_irq6->in_w<1>(state); }
 	void dio_irq7_w(int state) { m_maincpu->set_input_line(M68K_IRQ_7, state); }
 
 	bool m_bus_error = false;
@@ -268,6 +271,8 @@ void hp9k3xx_state::add_dio32_bus(machine_config &config)
 {
 	bus::hp_dio::dio32_device &dio32(DIO32(config, "diobus"));
 	dio32.set_program_space(m_maincpu, AS_PROGRAM);
+	// Propagate the CPU RESET instruction to the DIO-II cards, matching add_dio16_bus().
+	m_maincpu->reset_cb().set(dio32, FUNC(bus::hp_dio::dio16_device::reset_in));
 
 	dio32.irq1_out_cb().set(FUNC(hp9k3xx_state::dio_irq1_w));
 	dio32.irq2_out_cb().set(FUNC(hp9k3xx_state::dio_irq2_w));
@@ -320,10 +325,17 @@ void hp9k3xx_state::buserror_w(offs_t offset, uint32_t data, uint32_t mem_mask)
 
 void hp9k3xx_state::hp9k300(machine_config &config)
 {
+	// IRQ6 is a shared level-6 autovector line driven by both the on-board 6840 PTM and any
+	// DIO card set to level 6.  Feed both into an ANY_HIGH merger so one source deasserting does
+	// not clear another's still-asserted request (previously each drove the CPU line directly,
+	// so the last writer won).
+	INPUT_MERGER_ANY_HIGH(config, m_irq6);
+	m_irq6->output_handler().set_inputline(m_maincpu, M68K_IRQ_6);
+
 	ptm6840_device &ptm(PTM6840(config, PTM6840_TAG, 250000)); // from oscillator module next to the 6840
 	ptm.set_external_clocks(250000.0f, 0.0f, 250000.0f);
 	ptm.o3_callback().set(PTM6840_TAG, FUNC(ptm6840_device::set_c2));
-	ptm.irq_callback().set_inputline("maincpu", M68K_IRQ_6);
+	ptm.irq_callback().set(m_irq6, FUNC(input_merger_device::in_w<0>));
 
 	SOFTWARE_LIST(config, "flop_list").set_original("hp9k3xx_flop");
 	SOFTWARE_LIST(config, "cdrom_list").set_original("hp9k3xx_cdrom");
